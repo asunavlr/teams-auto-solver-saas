@@ -323,7 +323,7 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
     disciplina = atividade.get("disciplina", "")
     data_dir = config.data_dir
 
-    log(f"Processando: {nome_tarefa}", config.nome)
+    log(f"Processando: {nome_tarefa} | {disciplina}", config.nome)
 
     if atividade.get("tipo") != "assignment":
         return False
@@ -429,19 +429,26 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
             pdf_link = frame.locator('text=/.pdf/i').first
             await pdf_link.click(timeout=10000)
 
-            # Espera o preview carregar (aguarda elemento do visualizador ou timeout)
+            # Espera o preview carregar completamente
             log("  Aguardando preview carregar...", config.nome)
+
+            # Espera a pagina estabilizar
             try:
-                # Tenta aguardar elementos comuns de visualizador de PDF
-                await browser.page.wait_for_selector(
-                    'canvas, [data-page-number], .react-pdf__Page, iframe[src*="pdf"], '
-                    '[role="document"], .pdfViewer, #viewer, [class*="pdf"]',
-                    timeout=15000
-                )
-                await asyncio.sleep(3)  # Espera adicional para renderizar
+                await browser.page.wait_for_load_state("networkidle", timeout=20000)
             except Exception:
-                # Se não encontrar seletor específico, espera tempo fixo
-                await asyncio.sleep(10)
+                pass
+
+            # Espera adicional para garantir que o conteudo renderizou
+            await asyncio.sleep(8)
+
+            # Verifica se ainda tem loading spinner
+            try:
+                loading = browser.page.locator('[class*="loading"], [class*="spinner"], [class*="progress"]').first
+                await loading.wait_for(state="hidden", timeout=10000)
+            except Exception:
+                pass
+
+            await asyncio.sleep(2)  # Espera final
 
             ultimo_hash = None
             for page_num in range(1, MAX_PDF_PAGES + 1):
@@ -471,10 +478,6 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
                     await browser.page.mouse.wheel(0, 500)
                     await asyncio.sleep(1)
                 except Exception:
-                    break
-
-                # Se nao navegou de nenhuma forma, para o loop
-                if not navegou:
                     break
 
             await fechar_preview(browser)
