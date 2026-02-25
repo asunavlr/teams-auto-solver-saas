@@ -104,6 +104,16 @@
             <div class="col-auto">
                 <small class="text-muted">Jobs: <strong id="sys-jobs">-</strong></small>
             </div>
+            <div class="col-auto border-start ps-3">
+                <span class="badge bg-secondary" id="queue-status">
+                    <i class="bi bi-hourglass"></i> Fila: 0
+                </span>
+            </div>
+            <div class="col-auto" id="running-client-container" style="display: none;">
+                <span class="badge bg-info pulse" id="running-client">
+                    <i class="bi bi-arrow-repeat spin-slow"></i> Executando: -
+                </span>
+            </div>
         </div>
     </div>
 </div>
@@ -334,8 +344,12 @@ async function updateStats() {
 
 async function updateSystemStatus() {
     try {
-        const response = await fetch('/api/system/status');
-        const sys = await response.json();
+        const [sysResponse, schedulerResponse] = await Promise.all([
+            fetch('/api/system/status'),
+            fetch('/api/scheduler/jobs')
+        ]);
+        const sys = await sysResponse.json();
+        const scheduler = await schedulerResponse.json();
 
         document.getElementById('sys-uptime').textContent = sys.uptime;
         document.getElementById('sys-cpu').textContent = sys.cpu_percent + '%';
@@ -349,6 +363,29 @@ async function updateSystemStatus() {
         } else {
             schedulerStatus.className = 'badge bg-danger';
             schedulerStatus.innerHTML = '<i class="bi bi-stop-circle"></i> Scheduler Parado';
+        }
+
+        // Queue status
+        const queue = scheduler.queue || {};
+        const queueStatus = document.getElementById('queue-status');
+        const pendingCount = queue.pending_count || 0;
+
+        if (pendingCount > 0) {
+            queueStatus.className = 'badge bg-warning text-dark';
+            queueStatus.innerHTML = `<i class="bi bi-hourglass-split"></i> Fila: ${pendingCount}`;
+        } else {
+            queueStatus.className = 'badge bg-secondary';
+            queueStatus.innerHTML = `<i class="bi bi-hourglass"></i> Fila: 0`;
+        }
+
+        // Running client
+        const runningContainer = document.getElementById('running-client-container');
+        const runningBadge = document.getElementById('running-client');
+        if (queue.running_client) {
+            runningContainer.style.display = 'block';
+            runningBadge.innerHTML = `<i class="bi bi-arrow-repeat spin-slow"></i> Executando: #${queue.running_client}`;
+        } else {
+            runningContainer.style.display = 'none';
         }
     } catch (error) {
         console.error('Erro ao atualizar sistema:', error);
