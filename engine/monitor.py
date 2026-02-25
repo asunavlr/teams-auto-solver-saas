@@ -328,6 +328,17 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
     if atividade.get("tipo") != "assignment":
         return False
 
+    # Detecta atividades OBRIGATORIAMENTE em grupo (pula automaticamente)
+    # Só pula se tiver "em grupo", "em equipe", etc. - ignora "pode ser em dupla"
+    nome_lower = nome_tarefa.lower()
+    frases_grupo_obrigatorio = [
+        "trabalho em grupo", "atividade em grupo", "em equipe", "trabalho em equipe",
+        "atividade em equipe", "entrega em grupo", "fazer em grupo"
+    ]
+    if any(frase in nome_lower for frase in frases_grupo_obrigatorio):
+        log(f"  Atividade em GRUPO detectada, pulando: {nome_tarefa}", config.nome)
+        return "grupo"
+
     # Clica em Atribuicoes
     try:
         assignments_btn = browser.page.locator(

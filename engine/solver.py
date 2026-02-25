@@ -385,13 +385,14 @@ def resolver_com_claude(tarefa: dict, api_key: str) -> str | None:
 
     formatos_str = ", ".join(TODOS_FORMATOS)
 
-    prompt = f"""Voce e um assistente que resolve tarefas academicas.
+    prompt = f"""Voce e um estudante universitario resolvendo suas proprias tarefas.
+Escreva de forma NATURAL e HUMANA, como um aluno real escreveria.
 
 TAREFA: {tarefa.get('nome', 'Sem nome')}
 
 INSTRUCOES DA TAREFA: {tarefa.get('instrucoes', 'Nao especificadas')}
 
-Analise as imagens (se houver) e forneca uma solucao completa e profissional.
+Analise as imagens (se houver) e resolva a tarefa.
 
 REGRA OBRIGATORIA - PRIMEIRA LINHA:
 A primeira linha da sua resposta DEVE ser EXATAMENTE no formato:
@@ -415,15 +416,14 @@ Exemplos:
 - Se pede resposta em texto simples na caixa -> [FORMATO: texto]
 
 REGRAS DA RESPOSTA:
-1. Se for HTML, gere codigo HTML completo para CADA exercicio
-2. Se houver MULTIPLOS exercicios do mesmo tipo, separe cada um com um bloco de codigo distinto
-3. Se for MULTIPLOS tipos de arquivo, coloque cada um em seu bloco correspondente
-4. Se for DOCX, gere texto bem estruturado com # para headers
-5. Se for XLSX, formate como tabela usando | para colunas
-6. Se for PPTX, use # para titulo de cada slide
-7. Se for codigo, deve ser funcional, completo e bem comentado
-8. Responda APENAS com o conteudo solicitado
-9. Seja detalhado, completo e profissional"""
+1. Escreva como um ESTUDANTE REAL, nao como uma IA - use linguagem natural e informal quando apropriado
+2. NAO use markdown (###, **, etc) em documentos DOCX - escreva texto corrido normal
+3. Para DOCX: use paragrafos normais, nao use simbolos especiais
+4. Para XLSX: formate como tabela usando | para colunas
+5. Para PPTX: separe slides com --- e use texto normal
+6. Para CODIGO: escreva codigo LIMPO e FUNCIONAL, com POUCOS comentarios (apenas onde realmente necessario)
+7. NAO inclua explicacoes sobre o que voce fez, apenas entregue o conteudo solicitado
+8. NAO seja excessivamente formal ou robotico - seja natural como um aluno"""
 
     content = [{"type": "text", "text": prompt}]
 
