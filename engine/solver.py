@@ -442,17 +442,32 @@ REGRAS DA RESPOSTA:
         except Exception:
             pass
 
-    for tentativa in range(1, CLAUDE_MAX_RETRIES + 1):
-        try:
-            response = client.messages.create(
-                model="claude-sonnet-4-20250514",
-                max_tokens=8096,
-                messages=[{"role": "user", "content": content}]
-            )
-            return response.content[0].text
-        except Exception as e:
-            logger.error(f"Erro na API (tentativa {tentativa}/{CLAUDE_MAX_RETRIES}): {e}")
-            if tentativa < CLAUDE_MAX_RETRIES:
-                time.sleep(tentativa * 5)
-            else:
-                return None
+    # Lista de modelos para tentar (fallback)
+    modelos = [
+        ("claude-sonnet-4-20250514", "Sonnet 4"),
+        ("claude-3-5-haiku-20241022", "Haiku 3.5"),
+    ]
+
+    for modelo_id, modelo_nome in modelos:
+        logger.info(f"Tentando com {modelo_nome}...")
+
+        for tentativa in range(1, CLAUDE_MAX_RETRIES + 1):
+            try:
+                response = client.messages.create(
+                    model=modelo_id,
+                    max_tokens=8096,
+                    messages=[{"role": "user", "content": content}]
+                )
+                logger.info(f"Sucesso com {modelo_nome}!")
+                return response.content[0].text
+            except Exception as e:
+                logger.error(f"Erro na API {modelo_nome} (tentativa {tentativa}/{CLAUDE_MAX_RETRIES}): {e}")
+                if tentativa < CLAUDE_MAX_RETRIES:
+                    time.sleep(tentativa * 5)
+
+        # Se chegou aqui, falhou todas as tentativas com este modelo
+        logger.warning(f"{modelo_nome} falhou, tentando proximo modelo...")
+
+    # Todos os modelos falharam
+    logger.error("Todos os modelos falharam!")
+    return None
