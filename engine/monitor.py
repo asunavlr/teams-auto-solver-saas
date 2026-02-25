@@ -762,14 +762,14 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
 def update_client_status(client_id: int, status: str, action: str = "", error: str = ""):
     """Atualiza status em tempo real do cliente (thread-safe)."""
     try:
-        from web import db
+        from web import create_app, db
         from web.models import ClientStatus
-        from flask import current_app
 
-        with current_app.app_context():
+        app = create_app()
+        with app.app_context():
             ClientStatus.set_status(client_id, status, action, error)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Erro ao atualizar status do cliente {client_id}: {e}")
 
 
 async def ciclo_monitoramento_cliente(config: ClientConfig) -> dict:
