@@ -117,3 +117,51 @@ class Payment(db.Model):
     amount = db.Column(db.Float, default=0.0)
     months = db.Column(db.Integer, default=1)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class ClientStatus(db.Model):
+    """Status em tempo real de cada cliente."""
+    __tablename__ = "client_status"
+
+    id = db.Column(db.Integer, primary_key=True)
+    client_id = db.Column(db.Integer, db.ForeignKey("clients.id"), nullable=False, unique=True)
+    status = db.Column(db.String(20), default="idle")  # idle, running, error
+    current_action = db.Column(db.String(300), default="")  # descricao do que esta fazendo
+    started_at = db.Column(db.DateTime)
+    last_error = db.Column(db.Text, default="")
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    client = db.relationship("Client", backref=db.backref("runtime_status", uselist=False))
+
+    @classmethod
+    def set_status(cls, client_id: int, status: str, action: str = "", error: str = ""):
+        """Atualiza status do cliente."""
+        obj = cls.query.filter_by(client_id=client_id).first()
+        if not obj:
+            obj = cls(client_id=client_id)
+            db.session.add(obj)
+
+        obj.status = status
+        obj.current_action = action
+        if status == "running" and not obj.started_at:
+            obj.started_at = datetime.utcnow()
+        elif status == "idle":
+            obj.started_at = None
+        if error:
+            obj.last_error = error
+
+        db.session.commit()
+        return obj
+
+    @classmethod
+    def get_status(cls, client_id: int):
+        """Retorna status do cliente."""
+        obj = cls.query.filter_by(client_id=client_id).first()
+        if obj:
+            return {
+                "status": obj.status,
+                "current_action": obj.current_action,
+                "started_at": obj.started_at,
+                "last_error": obj.last_error
+            }
+        return {"status": "idle", "current_action": "", "started_at": None, "last_error": ""}

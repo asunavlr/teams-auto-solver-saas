@@ -21,9 +21,11 @@ def create_app():
 
     from web.auth import auth_bp
     from web.routes import main_bp
+    from web.api import api_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(main_bp)
+    app.register_blueprint(api_bp)
 
     with app.app_context():
         from web import models  # noqa: F401

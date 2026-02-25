@@ -733,6 +733,19 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
         return False
 
 
+def update_client_status(client_id: int, status: str, action: str = "", error: str = ""):
+    """Atualiza status em tempo real do cliente (thread-safe)."""
+    try:
+        from web import db
+        from web.models import ClientStatus
+        from flask import current_app
+
+        with current_app.app_context():
+            ClientStatus.set_status(client_id, status, action, error)
+    except Exception:
+        pass
+
+
 async def ciclo_monitoramento_cliente(config: ClientConfig) -> dict:
     """
     Executa um ciclo de monitoramento para um cliente.
@@ -741,6 +754,7 @@ async def ciclo_monitoramento_cliente(config: ClientConfig) -> dict:
     resultado = {"success": 0, "error": 0, "tasks": []}
 
     log(f"Iniciando ciclo de monitoramento", config.nome)
+    update_client_status(config.client_id, "running", "Iniciando monitoramento...")
 
     browser = TeamsBrowser(
         auth_state_path=config.auth_state_path,
@@ -751,6 +765,7 @@ async def ciclo_monitoramento_cliente(config: ClientConfig) -> dict:
 
     try:
         log("Conectando ao Teams...", config.nome)
+        update_client_status(config.client_id, "running", "Conectando ao Teams...")
         await browser.page.goto("https://teams.microsoft.com")
         await browser.page.wait_for_load_state("networkidle")
         await asyncio.sleep(8)
@@ -758,9 +773,11 @@ async def ciclo_monitoramento_cliente(config: ClientConfig) -> dict:
         page_content = await browser.page.inner_text("body")
         if "Sign in" in page_content or "Entrar" in page_content:
             log("Sessao expirada, fazendo login...", config.nome)
+            update_client_status(config.client_id, "running", "Fazendo login...")
             login_ok = await browser.login()
             if not login_ok:
                 log("Login falhou! Abortando ciclo.", config.nome)
+                update_client_status(config.client_id, "error", "", "Falha no login")
                 resultado["error"] += 1
                 resultado["tasks"].append({
                     "name": "Login",
@@ -772,15 +789,19 @@ async def ciclo_monitoramento_cliente(config: ClientConfig) -> dict:
             await asyncio.sleep(5)
 
         processadas = carregar_processadas(config.processadas_path)
+        update_client_status(config.client_id, "running", "Verificando atividades...")
         atividades = await verificar_activity(browser, config.data_dir, config.nome)
         novas = [a for a in atividades if a.get("id") not in processadas]
 
         if not novas:
             log("Nenhuma atividade nova!", config.nome)
+            update_client_status(config.client_id, "idle", "Nenhuma atividade nova")
         else:
             log(f"{len(novas)} atividade(s) nova(s)", config.nome)
 
             for atividade in novas:
+                nome_tarefa = atividade.get("nome", "")[:50]
+                update_client_status(config.client_id, "running", f"Processando: {nome_tarefa}...")
                 try:
                     res = await processar_nova_atividade(browser, atividade, config)
                     if res:
@@ -816,9 +837,14 @@ async def ciclo_monitoramento_cliente(config: ClientConfig) -> dict:
 
     except Exception as e:
         log(f"Erro no ciclo: {e}", config.nome)
+        update_client_status(config.client_id, "error", "", str(e))
         resultado["error"] += 1
     finally:
         await browser.close()
+        if resultado["error"] == 0:
+            update_client_status(config.client_id, "idle", f"Ciclo concluido: {resultado['success']} tarefas")
+        else:
+            update_client_status(config.client_id, "error", "", f"{resultado['error']} erro(s)")
 
     log(f"Ciclo finalizado: {resultado['success']} ok, {resultado['error']} erros", config.nome)
     return resultado

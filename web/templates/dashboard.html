@@ -4,7 +4,7 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="fw-bold m-0">Dashboard</h4>
-    <small class="text-muted">Atualizado agora</small>
+    <small class="text-muted" id="last-update">Atualizado agora</small>
 </div>
 
 <!-- Stats Cards -->
@@ -16,7 +16,7 @@
                     <i class="bi bi-people-fill fs-4 text-primary"></i>
                 </div>
                 <div>
-                    <div class="fs-4 fw-bold">{{ stats.total_clients }}</div>
+                    <div class="fs-4 fw-bold" id="stat-total">{{ stats.total_clients }}</div>
                     <small class="text-muted">Total Clientes</small>
                 </div>
             </div>
@@ -29,7 +29,7 @@
                     <i class="bi bi-check-circle-fill fs-4 text-success"></i>
                 </div>
                 <div>
-                    <div class="fs-4 fw-bold">{{ stats.active_clients }}</div>
+                    <div class="fs-4 fw-bold" id="stat-active">{{ stats.active_clients }}</div>
                     <small class="text-muted">Ativos</small>
                 </div>
             </div>
@@ -42,7 +42,7 @@
                     <i class="bi bi-x-circle-fill fs-4 text-danger"></i>
                 </div>
                 <div>
-                    <div class="fs-4 fw-bold">{{ stats.expired_clients }}</div>
+                    <div class="fs-4 fw-bold" id="stat-expired">{{ stats.expired_clients }}</div>
                     <small class="text-muted">Expirados</small>
                 </div>
             </div>
@@ -55,7 +55,7 @@
                     <i class="bi bi-journal-check fs-4 text-info"></i>
                 </div>
                 <div>
-                    <div class="fs-4 fw-bold">{{ stats.tasks_today }}</div>
+                    <div class="fs-4 fw-bold" id="stat-tasks">{{ stats.tasks_today }}</div>
                     <small class="text-muted">Tarefas Hoje</small>
                 </div>
             </div>
@@ -76,12 +76,51 @@
 </div>
 {% endif %}
 
+<!-- Client Status Monitor -->
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-white border-0 pt-3 d-flex justify-content-between align-items-center">
+                <h6 class="fw-bold m-0"><i class="bi bi-activity"></i> Status em Tempo Real</h6>
+                <span class="badge bg-secondary" id="refresh-indicator">
+                    <i class="bi bi-arrow-repeat"></i> Auto-refresh: 10s
+                </span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0" id="status-table">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Cliente</th>
+                                <th>Assinatura</th>
+                                <th>Status</th>
+                                <th>Acao Atual</th>
+                                <th>Ultima Verificacao</th>
+                                <th>Tarefas</th>
+                            </tr>
+                        </thead>
+                        <tbody id="clients-status-body">
+                            <!-- Preenchido via JavaScript -->
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-4">
+                                    <i class="bi bi-arrow-repeat spin"></i> Carregando...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Recent Tasks & Clients -->
 <div class="row g-3">
     <div class="col-lg-7">
         <div class="card">
-            <div class="card-header bg-white border-0 pt-3">
+            <div class="card-header bg-white border-0 pt-3 d-flex justify-content-between align-items-center">
                 <h6 class="fw-bold m-0"><i class="bi bi-clock-history"></i> Ultimas Tarefas</h6>
+                <a href="{{ url_for('main.logs') }}" class="btn btn-sm btn-outline-secondary">Ver todos</a>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
@@ -95,7 +134,7 @@
                                 <th>Quando</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="recent-tasks-body">
                             {% for log in recent_tasks %}
                             <tr>
                                 <td>{{ log.client.nome }}</td>
@@ -155,4 +194,183 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.spin {
+    animation: spin 1s linear infinite;
+}
+@keyframes spin {
+    100% { transform: rotate(360deg); }
+}
+.status-running {
+    background-color: #dbeafe;
+}
+.status-error {
+    background-color: #fee2e2;
+}
+.pulse {
+    animation: pulse 2s infinite;
+}
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+</style>
+
+<script>
+const REFRESH_INTERVAL = 10000; // 10 segundos
+let lastLogTimestamp = null;
+
+function formatDate(isoString) {
+    if (!isoString) return '-';
+    const date = new Date(isoString);
+    return date.toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+function getStatusBadge(status) {
+    const badges = {
+        'active': '<span class="badge badge-active">Ativo</span>',
+        'paused': '<span class="badge badge-paused">Pausado</span>',
+        'expired': '<span class="badge badge-expired">Expirado</span>',
+    };
+    return badges[status] || '<span class="badge bg-secondary">-</span>';
+}
+
+function getRuntimeBadge(status) {
+    const badges = {
+        'idle': '<span class="badge bg-secondary"><i class="bi bi-pause-circle"></i> Idle</span>',
+        'running': '<span class="badge bg-primary pulse"><i class="bi bi-play-circle"></i> Executando</span>',
+        'error': '<span class="badge bg-danger"><i class="bi bi-exclamation-circle"></i> Erro</span>',
+    };
+    return badges[status] || '<span class="badge bg-secondary">-</span>';
+}
+
+async function updateClientsStatus() {
+    try {
+        const response = await fetch('/api/clients/status');
+        const clients = await response.json();
+
+        const tbody = document.getElementById('clients-status-body');
+        if (clients.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">Nenhum cliente cadastrado</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = clients.map(client => {
+            const rowClass = client.current_status === 'running' ? 'status-running' :
+                           client.current_status === 'error' ? 'status-error' : '';
+
+            return `
+                <tr class="${rowClass}">
+                    <td>
+                        <a href="/clients/${client.id}" class="fw-semibold text-decoration-none">${client.nome}</a>
+                        ${client.days_remaining <= 7 ? '<i class="bi bi-exclamation-triangle text-warning ms-1" title="Vence em ' + client.days_remaining + ' dias"></i>' : ''}
+                    </td>
+                    <td>${getStatusBadge(client.subscription_status)}</td>
+                    <td>${getRuntimeBadge(client.current_status)}</td>
+                    <td class="text-truncate" style="max-width: 200px;">
+                        ${client.current_action || '<span class="text-muted">-</span>'}
+                    </td>
+                    <td><small class="text-muted">${formatDate(client.last_check)}</small></td>
+                    <td>
+                        <span class="badge bg-info">${client.tasks_completed}</span>
+                        ${client.last_task ? '<br><small class="text-muted">' + client.last_task.name.substring(0, 20) + '...</small>' : ''}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+    } catch (error) {
+        console.error('Erro ao atualizar status:', error);
+    }
+}
+
+async function updateStats() {
+    try {
+        const response = await fetch('/api/dashboard/stats');
+        const stats = await response.json();
+
+        document.getElementById('stat-total').textContent = stats.total_clients;
+        document.getElementById('stat-active').textContent = stats.active_clients;
+        document.getElementById('stat-expired').textContent = stats.expired_clients;
+        document.getElementById('stat-tasks').textContent = stats.tasks_today;
+
+    } catch (error) {
+        console.error('Erro ao atualizar stats:', error);
+    }
+}
+
+async function updateRecentLogs() {
+    try {
+        let url = '/api/logs/recent?limit=10';
+        if (lastLogTimestamp) {
+            url += `&after=${encodeURIComponent(lastLogTimestamp)}`;
+        }
+
+        const response = await fetch(url);
+        const logs = await response.json();
+
+        if (logs.length > 0) {
+            lastLogTimestamp = logs[0].created_at;
+
+            const tbody = document.getElementById('recent-tasks-body');
+            const existingRows = tbody.innerHTML;
+
+            const newRows = logs.map(log => `
+                <tr class="table-success" style="animation: fadeIn 0.5s;">
+                    <td>${log.client_name}</td>
+                    <td class="text-truncate" style="max-width: 200px;">${log.task_name}</td>
+                    <td><span class="badge bg-secondary">${log.format || '-'}</span></td>
+                    <td>
+                        ${log.status === 'success' ?
+                            '<span class="badge bg-success">OK</span>' :
+                            '<span class="badge bg-danger">Erro</span>'}
+                    </td>
+                    <td><small class="text-muted">${formatDate(log.created_at)}</small></td>
+                </tr>
+            `).join('');
+
+            // Adiciona novos logs no topo
+            if (newRows) {
+                tbody.innerHTML = newRows + existingRows;
+                // Limita a 10 linhas
+                while (tbody.children.length > 10) {
+                    tbody.removeChild(tbody.lastChild);
+                }
+            }
+        }
+
+    } catch (error) {
+        console.error('Erro ao atualizar logs:', error);
+    }
+}
+
+function updateTimestamp() {
+    const now = new Date();
+    document.getElementById('last-update').textContent = 'Atualizado ' + now.toLocaleTimeString('pt-BR');
+}
+
+async function refreshAll() {
+    await Promise.all([
+        updateClientsStatus(),
+        updateStats(),
+        updateRecentLogs()
+    ]);
+    updateTimestamp();
+}
+
+// Inicializa
+document.addEventListener('DOMContentLoaded', () => {
+    refreshAll();
+    setInterval(refreshAll, REFRESH_INTERVAL);
+});
+</script>
 {% endblock %}
