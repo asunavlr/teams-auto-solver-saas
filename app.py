@@ -1,6 +1,7 @@
 """
 Teams Auto Solver SaaS - Entry Point
 Inicia o painel web Flask + scheduler de monitoramento.
+Version: 1.1.0 - Auto-deploy enabled
 """
 
 import os
