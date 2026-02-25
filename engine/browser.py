@@ -67,16 +67,25 @@ class TeamsBrowser:
             email_input = self.page.locator('input[type="email"]')
             await email_input.wait_for(timeout=10000)
             await email_input.fill(self.teams_email)
-            await self.page.click('input[type="submit"]')
+            await asyncio.sleep(1)
+
+            # Espera botao Next ficar habilitado
+            next_btn = self.page.locator('input[type="submit"]:not([disabled])')
+            await next_btn.wait_for(state="visible", timeout=10000)
+            await next_btn.click()
 
             await self.page.wait_for_load_state("networkidle")
-            await asyncio.sleep(2)
+            await asyncio.sleep(3)
 
+            # Pagina de senha (pode ser da instituicao)
             password_input = self.page.locator('input[type="password"]')
-            await password_input.wait_for(timeout=10000)
+            await password_input.wait_for(timeout=15000)
+            await asyncio.sleep(1)
             await password_input.fill(self.teams_password)
+            await asyncio.sleep(1)
 
-            submit_btn = self.page.locator('input[type="submit"], button[type="submit"]').first
+            submit_btn = self.page.locator('input[type="submit"]:not([disabled]), button[type="submit"]').first
+            await submit_btn.wait_for(state="visible", timeout=10000)
             await submit_btn.click()
 
             await self.page.wait_for_load_state("networkidle")
