@@ -79,6 +79,18 @@ def _ensure_queue_processor():
             thread.start()
 
 
+def _update_client_status(app, client_id: int, status: str, action: str = "", error: str = ""):
+    """Atualiza status do cliente no banco (dentro do contexto do app)."""
+    try:
+        from web.models import ClientStatus
+        from web import db
+
+        with app.app_context():
+            ClientStatus.set_status(client_id, status, action, error)
+    except Exception as e:
+        logger.debug(f"Erro ao atualizar status: {e}")
+
+
 def _execute_client(client_id: int):
     """Executa o ciclo de monitoramento para um cliente."""
     global _running_client
@@ -87,12 +99,16 @@ def _execute_client(client_id: int):
     with _lock:
         _running_client = client_id
 
+    app = None
     try:
         from web import db, create_app
         from web.models import Client, TaskLog
-        from engine.monitor import ciclo_monitoramento_cliente
 
         app = create_app()
+
+        # Atualiza status para "running"
+        _update_client_status(app, client_id, "running", "Iniciando ciclo...")
+
         with app.app_context():
             client = db.session.get(Client, client_id)
             if not client:
@@ -105,18 +121,24 @@ def _execute_client(client_id: int):
                 if client.is_expired:
                     client.status = "expired"
                     db.session.commit()
+                _update_client_status(app, client_id, "idle", "Cliente inativo")
                 return
 
             config = _build_client_config(client)
+            client_nome = client.nome
 
-            # Executa o ciclo async
-            loop = asyncio.new_event_loop()
-            try:
-                resultado = loop.run_until_complete(ciclo_monitoramento_cliente(config))
-            finally:
-                loop.close()
+        # Executa o ciclo async (fora do app_context pra nao bloquear)
+        from engine.monitor import ciclo_monitoramento_cliente
 
-            # Atualiza banco com resultados
+        loop = asyncio.new_event_loop()
+        try:
+            resultado = loop.run_until_complete(ciclo_monitoramento_cliente(config))
+        finally:
+            loop.close()
+
+        # Atualiza banco com resultados
+        with app.app_context():
+            client = db.session.get(Client, client_id)
             client.last_check = datetime.utcnow()
 
             for task in resultado.get("tasks", []):
@@ -133,10 +155,21 @@ def _execute_client(client_id: int):
                     client.tasks_completed += 1
 
             db.session.commit()
-            logger.info(f"Cliente {client.nome}: ciclo concluido")
+
+        # Atualiza status final
+        success_count = resultado.get("success", 0)
+        error_count = resultado.get("error", 0)
+        if error_count > 0:
+            _update_client_status(app, client_id, "idle", f"Concluido: {error_count} erro(s)")
+        else:
+            _update_client_status(app, client_id, "idle", f"Concluido: {success_count} tarefa(s)")
+
+        logger.info(f"Cliente {client_nome}: ciclo concluido")
 
     except Exception as e:
         logger.error(f"Erro no job do cliente {client_id}: {e}")
+        if app:
+            _update_client_status(app, client_id, "error", "", str(e))
     finally:
         with _lock:
             _running_client = None
