@@ -112,10 +112,15 @@
                         <label class="form-label fw-medium">Senha SMTP</label>
                         <input type="password" name="smtp_password" class="form-control" placeholder="{{ '••••••••' if client and client.smtp_password else 'Senha de app' }}">
                     </div>
-                    <div class="mb-0">
+                    <div class="mb-3">
                         <label class="form-label fw-medium">Email de destino</label>
                         <input type="email" name="notification_email" class="form-control" value="{{ client.notification_email if client else '' }}" placeholder="destino@exemplo.com">
                         <small class="text-muted">Email que recebera as notificacoes</small>
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label fw-medium">WhatsApp</label>
+                        <input type="text" name="whatsapp" class="form-control" value="{{ client.whatsapp if client else '' }}" placeholder="11999998888">
+                        <small class="text-muted">Numero com DDD para notificacoes</small>
                     </div>
                 </div>
             </div>

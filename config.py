@@ -35,3 +35,8 @@ LOG_DIR.mkdir(exist_ok=True)
 
 # Timezone (padrao: America/Sao_Paulo)
 TIMEZONE = os.getenv("TIMEZONE", "America/Sao_Paulo")
+
+# UazAPI (WhatsApp)
+UAZAPI_URL = os.getenv("UAZAPI_URL", "")
+UAZAPI_TOKEN = os.getenv("UAZAPI_TOKEN", "")
+ADMIN_WHATSAPP = os.getenv("ADMIN_WHATSAPP", "")  # Numero do admin para alertas

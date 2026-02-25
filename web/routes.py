@@ -99,6 +99,7 @@ def client_add():
             smtp_email=request.form.get("smtp_email", ""),
             smtp_password=request.form.get("smtp_password", ""),
             notification_email=request.form.get("notification_email", ""),
+            whatsapp=request.form.get("whatsapp", ""),
             check_interval=int(request.form.get("check_interval", 60)),
             expires_at=datetime.utcnow() + timedelta(days=30 * months),
             status="active",
@@ -161,6 +162,7 @@ def client_edit(client_id):
         client.check_interval = int(request.form.get("check_interval", 60))
         client.smtp_email = request.form.get("smtp_email", "")
         client.notification_email = request.form.get("notification_email", "")
+        client.whatsapp = request.form.get("whatsapp", "")
 
         # So atualiza senhas se preenchidas
         if request.form.get("teams_password"):

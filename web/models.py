@@ -37,6 +37,7 @@ class Client(db.Model):
     smtp_email = db.Column(db.String(200), default="")
     _smtp_password = db.Column("smtp_password", db.Text, default="")
     notification_email = db.Column(db.String(200), default="")
+    whatsapp = db.Column(db.String(20), default="")  # Numero para notificacoes WhatsApp
     status = db.Column(db.String(20), default="active")
     expires_at = db.Column(db.DateTime, nullable=False)
     check_interval = db.Column(db.Integer, default=60)

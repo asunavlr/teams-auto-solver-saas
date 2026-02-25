@@ -40,6 +40,7 @@ def _build_client_config(client):
         smtp_email=client.smtp_email,
         smtp_password=client.smtp_password,
         notification_email=client.notification_email,
+        whatsapp=getattr(client, 'whatsapp', ''),
     )
 
 
@@ -166,10 +167,27 @@ def _execute_client(client_id: int):
 
         logger.info(f"Cliente {client_nome}: ciclo concluido")
 
+        # Envia notificacao WhatsApp se configurado
+        if config.whatsapp and (success_count > 0 or error_count > 0):
+            try:
+                from engine.whatsapp import notificar_ciclo_concluido
+                notificar_ciclo_concluido(config.whatsapp, config.nome, success_count, error_count)
+            except Exception as e:
+                logger.debug(f"Erro ao enviar WhatsApp: {e}")
+
     except Exception as e:
         logger.error(f"Erro no job do cliente {client_id}: {e}")
         if app:
             _update_client_status(app, client_id, "error", "", str(e))
+
+            # Notifica admin sobre erro
+            try:
+                import config as cfg
+                if cfg.ADMIN_WHATSAPP:
+                    from engine.whatsapp import notificar_admin_erro
+                    notificar_admin_erro(cfg.ADMIN_WHATSAPP, client_nome if 'client_nome' in dir() else f"ID {client_id}", str(e), client_id)
+            except Exception:
+                pass
     finally:
         with _lock:
             _running_client = None

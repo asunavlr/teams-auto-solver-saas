@@ -37,7 +37,7 @@ class ClientConfig:
                  teams_password: str, anthropic_key: str,
                  data_dir: Path, check_interval: int = 60,
                  smtp_email: str = "", smtp_password: str = "",
-                 notification_email: str = ""):
+                 notification_email: str = "", whatsapp: str = ""):
         self.client_id = client_id
         self.nome = nome
         self.teams_email = teams_email
@@ -48,6 +48,7 @@ class ClientConfig:
         self.smtp_email = smtp_email
         self.smtp_password = smtp_password
         self.notification_email = notification_email
+        self.whatsapp = whatsapp
 
         # Garante que o diretorio existe
         self.data_dir.mkdir(parents=True, exist_ok=True)
