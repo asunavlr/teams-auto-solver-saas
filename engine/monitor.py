@@ -166,10 +166,40 @@ async def verificar_activity(browser, data_dir: Path, client_name: str = "", max
     return []
 
 
-async def buscar_tarefa_no_frame(frame, nome_tarefa: str) -> bool:
-    """Busca e clica na tarefa pelo nome."""
+async def buscar_tarefa_no_frame(frame, nome_tarefa: str, disciplina: str = "") -> bool:
+    """Busca e clica na tarefa pelo nome, considerando a disciplina se fornecida."""
     nome_limpo = re.sub(r'[()\\/*+?\[\]{}|^$.]', '', nome_tarefa).strip()
 
+    # Se tem disciplina, tenta encontrar a tarefa que está associada a ela
+    if disciplina:
+        try:
+            # Pega o conteudo da pagina para verificar contexto
+            page_content = await frame.inner_text("body")
+
+            # Busca todas as tarefas com o nome
+            resultados = frame.locator(f'text=/{re.escape(nome_limpo)}/i')
+            count = await resultados.count()
+
+            if count > 1:
+                # Se tem mais de uma, tenta achar a que está perto da disciplina
+                for idx in range(count):
+                    try:
+                        elemento = resultados.nth(idx)
+                        # Pega o texto do elemento pai para ver se contem a disciplina
+                        parent = elemento.locator('xpath=ancestor::*[contains(@class, "assignment") or contains(@class, "item") or contains(@class, "card")]').first
+                        parent_text = await parent.inner_text(timeout=2000)
+
+                        # Verifica se a disciplina está no contexto
+                        disciplina_curta = disciplina.split("-")[-1].strip() if "-" in disciplina else disciplina
+                        if disciplina_curta.lower() in parent_text.lower():
+                            await elemento.click(timeout=5000)
+                            return True
+                    except Exception:
+                        continue
+        except Exception:
+            pass
+
+    # Fallback: busca normal pelo nome
     try:
         task = frame.locator(f'text=/{re.escape(nome_limpo)}/i').first
         await task.click(timeout=5000)
@@ -253,7 +283,7 @@ async def fechar_preview(browser):
     await asyncio.sleep(1)
 
 
-async def recuperar_frame_tarefa(browser, frame, nome_tarefa):
+async def recuperar_frame_tarefa(browser, frame, nome_tarefa, disciplina=""):
     """Recupera o frame de assignments se perdido."""
     for f in browser.page.frames:
         if "assignments" in f.url.lower():
@@ -278,7 +308,7 @@ async def recuperar_frame_tarefa(browser, frame, nome_tarefa):
                 tab_btn = frame.locator(f'text="{tab}"').first
                 await tab_btn.click(timeout=5000)
                 await asyncio.sleep(2)
-                if await buscar_tarefa_no_frame(frame, nome_tarefa):
+                if await buscar_tarefa_no_frame(frame, nome_tarefa, disciplina):
                     await asyncio.sleep(4)
                     break
             except Exception:
@@ -342,7 +372,7 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
                 await tab_btn.click(timeout=5000)
                 await asyncio.sleep(3)
 
-                if nome_tarefa and await buscar_tarefa_no_frame(frame, nome_tarefa):
+                if nome_tarefa and await buscar_tarefa_no_frame(frame, nome_tarefa, disciplina):
                     await asyncio.sleep(4)
                     log(f"  Tarefa encontrada em {tab}!", config.nome)
                     tarefa_encontrada = True
@@ -448,7 +478,7 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
                     break
 
             await fechar_preview(browser)
-            frame = await recuperar_frame_tarefa(browser, frame, nome_tarefa)
+            frame = await recuperar_frame_tarefa(browser, frame, nome_tarefa, disciplina)
         except Exception as e:
             log(f"  Erro ao processar PDF: {e}", config.nome)
             # Tenta fechar qualquer preview aberto
@@ -478,7 +508,7 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
                         break
             except Exception:
                 pass
-        frame = await recuperar_frame_tarefa(browser, frame, nome_tarefa)
+        frame = await recuperar_frame_tarefa(browser, frame, nome_tarefa, disciplina)
 
     # Processa documentos anexados (abre preview e tira screenshots, como PDF)
     tem_docx_anexo = any(ext in content_lower for ext in [".docx", ".doc"])
@@ -533,7 +563,7 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
 
                 # Fecha o preview
                 await fechar_preview(browser)
-                frame = await recuperar_frame_tarefa(browser, frame, nome_tarefa)
+                frame = await recuperar_frame_tarefa(browser, frame, nome_tarefa, disciplina)
 
             except Exception as e:
                 log(f"  Erro ao processar documento {ext}: {e}", config.nome)
@@ -543,7 +573,7 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
                 except Exception:
                     pass
 
-        frame = await recuperar_frame_tarefa(browser, frame, nome_tarefa)
+        frame = await recuperar_frame_tarefa(browser, frame, nome_tarefa, disciplina)
 
     # Resolve com Claude
     log("Enviando para Claude...", config.nome)
