@@ -398,7 +398,20 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
             # Encontra e clica no PDF para abrir preview
             pdf_link = frame.locator('text=/.pdf/i').first
             await pdf_link.click(timeout=10000)
-            await asyncio.sleep(5)  # Espera o preview carregar
+
+            # Espera o preview carregar (aguarda elemento do visualizador ou timeout)
+            log("  Aguardando preview carregar...", config.nome)
+            try:
+                # Tenta aguardar elementos comuns de visualizador de PDF
+                await browser.page.wait_for_selector(
+                    'canvas, [data-page-number], .react-pdf__Page, iframe[src*="pdf"], '
+                    '[role="document"], .pdfViewer, #viewer, [class*="pdf"]',
+                    timeout=15000
+                )
+                await asyncio.sleep(3)  # Espera adicional para renderizar
+            except Exception:
+                # Se não encontrar seletor específico, espera tempo fixo
+                await asyncio.sleep(10)
 
             for page_num in range(1, MAX_PDF_PAGES + 1):
                 ss_path = data_dir / f"pdf_novo_{page_num}.png"
@@ -411,10 +424,11 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
                     next_btn = browser.page.locator(
                         'button[aria-label*="Next"], button[aria-label*="Próxim"], '
                         'button[aria-label*="Proxim"], button[aria-label*="next"], '
-                        '[data-icon-name="ChevronRight"], button:has-text(">")'
+                        '[data-icon-name="ChevronRight"], button:has-text(">"), '
+                        '[aria-label*="page"], button[title*="Next"], button[title*="Próxim"]'
                     ).first
-                    await next_btn.click(timeout=2000)
-                    await asyncio.sleep(1)
+                    await next_btn.click(timeout=3000)
+                    await asyncio.sleep(2)
                 except Exception:
                     # Nao tem mais paginas
                     break
