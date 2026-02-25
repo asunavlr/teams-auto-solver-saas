@@ -1,12 +1,20 @@
 """API endpoints para dados em tempo real."""
 
+import os
+from collections import deque
 from datetime import datetime, timedelta
+from pathlib import Path
+
 from flask import Blueprint, jsonify, request
 from flask_login import login_required
+
 from web import db
 from web.models import Client, TaskLog, ClientStatus
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
+
+# Cache para posicao do arquivo de log
+_log_positions = {}
 
 
 @api_bp.route("/dashboard/stats")
@@ -157,3 +165,106 @@ def activity_timeline():
         {"hour": k, **v}
         for k, v in sorted(hours.items())
     ])
+
+
+@api_bp.route("/server/logs")
+@login_required
+def server_logs():
+    """Retorna logs do servidor (arquivo app.log)."""
+    lines = request.args.get("lines", 100, type=int)
+    after_line = request.args.get("after", 0, type=int)
+
+    # Caminho do arquivo de log
+    log_file = Path(__file__).parent.parent / "logs" / "app.log"
+
+    if not log_file.exists():
+        return jsonify({"lines": [], "last_line": 0, "total_lines": 0})
+
+    try:
+        with open(log_file, "r", encoding="utf-8", errors="replace") as f:
+            all_lines = f.readlines()
+
+        total_lines = len(all_lines)
+
+        # Se after_line especificado, retorna apenas linhas novas
+        if after_line > 0 and after_line < total_lines:
+            new_lines = all_lines[after_line:]
+            return jsonify({
+                "lines": [line.rstrip() for line in new_lines[-lines:]],
+                "last_line": total_lines,
+                "total_lines": total_lines,
+                "new_count": len(new_lines)
+            })
+
+        # Retorna ultimas N linhas
+        recent_lines = all_lines[-lines:] if lines < total_lines else all_lines
+
+        return jsonify({
+            "lines": [line.rstrip() for line in recent_lines],
+            "last_line": total_lines,
+            "total_lines": total_lines
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e), "lines": [], "last_line": 0})
+
+
+@api_bp.route("/server/logs/stream")
+@login_required
+def server_logs_stream():
+    """Retorna novas linhas do log desde a ultima posicao."""
+    session_id = request.args.get("session", "default")
+    lines_limit = request.args.get("lines", 50, type=int)
+
+    log_file = Path(__file__).parent.parent / "logs" / "app.log"
+
+    if not log_file.exists():
+        return jsonify({"lines": [], "position": 0})
+
+    try:
+        # Obtem posicao anterior
+        last_pos = _log_positions.get(session_id, 0)
+
+        with open(log_file, "r", encoding="utf-8", errors="replace") as f:
+            # Vai para o final para saber o tamanho
+            f.seek(0, 2)
+            file_size = f.tell()
+
+            # Se arquivo foi truncado/rotacionado, reinicia
+            if last_pos > file_size:
+                last_pos = 0
+
+            # Se primeira vez, pega ultimas N linhas
+            if last_pos == 0:
+                f.seek(0)
+                all_lines = f.readlines()
+                lines = all_lines[-lines_limit:]
+                _log_positions[session_id] = file_size
+                return jsonify({
+                    "lines": [l.rstrip() for l in lines],
+                    "position": file_size,
+                    "is_initial": True
+                })
+
+            # Le novas linhas
+            f.seek(last_pos)
+            new_content = f.read()
+            new_pos = f.tell()
+
+            _log_positions[session_id] = new_pos
+
+            if new_content:
+                lines = new_content.splitlines()
+                return jsonify({
+                    "lines": lines[-lines_limit:],
+                    "position": new_pos,
+                    "new_count": len(lines)
+                })
+
+            return jsonify({
+                "lines": [],
+                "position": new_pos
+            })
+
+    except Exception as e:
+        return jsonify({"error": str(e), "lines": [], "position": 0})

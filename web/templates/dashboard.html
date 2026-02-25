@@ -194,15 +194,15 @@
                                 </td>
                                 <td>
                                     {% if log.status == 'success' %}
-                                        <span class="badge bg-success"><i class="bi bi-check-lg"></i> Enviado</span>
+                                        <span class="badge badge-success"><i class="bi bi-check-lg"></i> Enviado</span>
                                     {% elif log.status == 'not_found' %}
-                                        <span class="badge bg-secondary"><i class="bi bi-search"></i> Nao encontrado</span>
+                                        <span class="badge badge-secondary"><i class="bi bi-search"></i> Nao encontrado</span>
                                     {% elif log.status == 'group' %}
-                                        <span class="badge bg-info"><i class="bi bi-people"></i> Grupo</span>
+                                        <span class="badge badge-group"><i class="bi bi-people"></i> Grupo</span>
                                     {% elif log.status == 'skipped' %}
-                                        <span class="badge bg-warning text-dark"><i class="bi bi-skip-forward"></i> Pulado</span>
+                                        <span class="badge badge-skipped"><i class="bi bi-skip-forward"></i> Pulado</span>
                                     {% else %}
-                                        <span class="badge bg-danger"><i class="bi bi-x-lg"></i> Erro</span>
+                                        <span class="badge badge-error"><i class="bi bi-x-lg"></i> Erro</span>
                                     {% endif %}
                                 </td>
                                 <td>
@@ -248,11 +248,11 @@
                             </div>
                             <div class="text-end">
                                 {% if client.is_active %}
-                                    <span class="badge bg-success-subtle text-success">Ativo</span>
+                                    <span class="badge badge-success">Ativo</span>
                                 {% elif client.status == 'paused' %}
-                                    <span class="badge bg-warning-subtle text-warning">Pausado</span>
+                                    <span class="badge badge-warning">Pausado</span>
                                 {% else %}
-                                    <span class="badge bg-danger-subtle text-danger">Expirado</span>
+                                    <span class="badge badge-error">Expirado</span>
                                 {% endif %}
                                 <div class="mt-1">
                                     <small class="text-muted"><i class="bi bi-check2-all"></i> {{ client.tasks_completed }}</small>
@@ -353,31 +353,31 @@ function formatDate(isoString) {
 
 function getSubscriptionBadge(status) {
     const badges = {
-        'active': '<span class="badge bg-success-subtle text-success">Ativo</span>',
-        'paused': '<span class="badge bg-warning-subtle text-warning">Pausado</span>',
-        'expired': '<span class="badge bg-danger-subtle text-danger">Expirado</span>',
+        'active': '<span class="badge badge-success">Ativo</span>',
+        'paused': '<span class="badge badge-warning">Pausado</span>',
+        'expired': '<span class="badge badge-error">Expirado</span>',
     };
-    return badges[status] || '<span class="badge bg-secondary">-</span>';
+    return badges[status] || '<span class="badge badge-secondary">-</span>';
 }
 
 function getRuntimeBadge(status) {
     const badges = {
-        'idle': '<span class="badge bg-secondary-subtle text-secondary"><i class="bi bi-pause-circle"></i> Aguardando</span>',
+        'idle': '<span class="badge badge-secondary"><i class="bi bi-pause-circle"></i> Aguardando</span>',
         'running': '<span class="badge bg-primary pulse"><i class="bi bi-play-circle-fill"></i> Executando</span>',
-        'error': '<span class="badge bg-danger"><i class="bi bi-exclamation-triangle"></i> Erro</span>',
+        'error': '<span class="badge badge-error"><i class="bi bi-exclamation-triangle"></i> Erro</span>',
     };
-    return badges[status] || '<span class="badge bg-secondary">-</span>';
+    return badges[status] || '<span class="badge badge-secondary">-</span>';
 }
 
 function getTaskStatusBadge(status) {
     const badges = {
-        'success': '<span class="badge bg-success"><i class="bi bi-check-lg"></i> Enviado</span>',
-        'not_found': '<span class="badge bg-secondary"><i class="bi bi-search"></i> Nao encontrado</span>',
-        'group': '<span class="badge bg-info"><i class="bi bi-people"></i> Grupo</span>',
-        'skipped': '<span class="badge bg-warning text-dark"><i class="bi bi-skip-forward"></i> Pulado</span>',
-        'error': '<span class="badge bg-danger"><i class="bi bi-x-lg"></i> Erro</span>',
+        'success': '<span class="badge badge-success"><i class="bi bi-check-lg"></i> Enviado</span>',
+        'not_found': '<span class="badge badge-secondary"><i class="bi bi-search"></i> Nao encontrado</span>',
+        'group': '<span class="badge badge-group"><i class="bi bi-people"></i> Grupo</span>',
+        'skipped': '<span class="badge badge-skipped"><i class="bi bi-skip-forward"></i> Pulado</span>',
+        'error': '<span class="badge badge-error"><i class="bi bi-x-lg"></i> Erro</span>',
     };
-    return badges[status] || '<span class="badge bg-secondary">-</span>';
+    return badges[status] || '<span class="badge badge-secondary">-</span>';
 }
 
 function getFormatBadge(format) {

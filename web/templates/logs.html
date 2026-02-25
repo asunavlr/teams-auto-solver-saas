@@ -3,7 +3,10 @@
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h4 class="fw-bold m-0">Logs de Execucao</h4>
+    <div>
+        <h4 class="fw-bold m-0">Logs de Execucao</h4>
+        <small class="text-muted">Historico de tarefas processadas</small>
+    </div>
     <form method="GET" class="d-flex gap-2">
         <select name="client_id" class="form-select form-select-sm" style="width: 200px;">
             <option value="">Todos os clientes</option>
@@ -11,21 +14,28 @@
                 <option value="{{ c.id }}" {% if selected_client == c.id %}selected{% endif %}>{{ c.nome }}</option>
             {% endfor %}
         </select>
-        <select name="status" class="form-select form-select-sm" style="width: 120px;">
-            <option value="">Todos</option>
-            <option value="success" {% if selected_status == 'success' %}selected{% endif %}>Sucesso</option>
+        <select name="status" class="form-select form-select-sm" style="width: 140px;">
+            <option value="">Todos status</option>
+            <option value="success" {% if selected_status == 'success' %}selected{% endif %}>Enviado</option>
+            <option value="not_found" {% if selected_status == 'not_found' %}selected{% endif %}>Nao encontrado</option>
+            <option value="group" {% if selected_status == 'group' %}selected{% endif %}>Grupo</option>
+            <option value="skipped" {% if selected_status == 'skipped' %}selected{% endif %}>Pulado</option>
             <option value="error" {% if selected_status == 'error' %}selected{% endif %}>Erro</option>
         </select>
-        <button class="btn btn-sm btn-primary"><i class="bi bi-search"></i></button>
+        <button class="btn btn-sm btn-primary"><i class="bi bi-search"></i> Filtrar</button>
     </form>
 </div>
 
-<div class="card">
+<!-- Task Logs Table -->
+<div class="card mb-4">
+    <div class="card-header bg-white py-3">
+        <h6 class="fw-bold m-0"><i class="bi bi-list-check text-primary"></i> Historico de Tarefas</h6>
+    </div>
     <div class="table-responsive">
-        <table class="table table-hover mb-0">
-            <thead class="table-light">
-                <tr>
-                    <th>Data</th>
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr class="bg-light">
+                    <th class="ps-4">Data</th>
                     <th>Cliente</th>
                     <th>Tarefa</th>
                     <th>Disciplina</th>
@@ -37,44 +47,341 @@
             <tbody>
                 {% for log in logs %}
                 <tr>
-                    <td><small>{{ log.created_at.strftime('%d/%m/%Y %H:%M') }}</small></td>
+                    <td class="ps-4"><small class="text-muted">{{ log.created_at.strftime('%d/%m/%Y %H:%M') }}</small></td>
                     <td>
-                        <a href="{{ url_for('main.client_detail', client_id=log.client_id) }}">
+                        <a href="{{ url_for('main.client_detail', client_id=log.client_id) }}" class="fw-medium text-decoration-none">
                             {{ log.client.nome }}
                         </a>
                     </td>
-                    <td class="text-truncate" style="max-width: 250px;">{{ log.task_name }}</td>
-                    <td>{{ log.discipline or '-' }}</td>
-                    <td><span class="badge bg-secondary">{{ log.format or '-' }}</span></td>
                     <td>
-                        {% if log.status == 'success' %}
-                            <span class="badge bg-success">OK</span>
+                        <div class="text-truncate" style="max-width: 250px;" title="{{ log.task_name }}">
+                            {{ log.task_name }}
+                        </div>
+                    </td>
+                    <td>
+                        <small class="text-muted">{{ log.discipline[:30] if log.discipline else '-' }}</small>
+                    </td>
+                    <td>
+                        {% if log.format %}
+                            {% if log.format == 'docx' %}
+                                <span class="badge bg-primary-subtle text-primary"><i class="bi bi-file-earmark-word"></i> DOCX</span>
+                            {% elif log.format == 'pdf' %}
+                                <span class="badge bg-danger-subtle text-danger"><i class="bi bi-file-earmark-pdf"></i> PDF</span>
+                            {% elif log.format == 'texto' %}
+                                <span class="badge bg-secondary-subtle text-secondary"><i class="bi bi-file-earmark-text"></i> Texto</span>
+                            {% elif log.format in ['py', 'js', 'html', 'css', 'java', 'cpp', 'c'] %}
+                                <span class="badge bg-success-subtle text-success"><i class="bi bi-file-earmark-code"></i> {{ log.format|upper }}</span>
+                            {% elif log.format == 'zip' %}
+                                <span class="badge bg-warning-subtle text-warning"><i class="bi bi-file-earmark-zip"></i> ZIP</span>
+                            {% else %}
+                                <span class="badge bg-light text-dark border">{{ log.format|upper }}</span>
+                            {% endif %}
                         {% else %}
-                            <span class="badge bg-danger">Erro</span>
+                            <span class="text-muted">-</span>
                         {% endif %}
                     </td>
-                    <td class="text-truncate" style="max-width: 200px;">
-                        <small class="text-danger">{{ log.error_msg or '' }}</small>
+                    <td>
+                        {% if log.status == 'success' %}
+                            <span class="badge badge-success"><i class="bi bi-check-lg"></i> Enviado</span>
+                        {% elif log.status == 'not_found' %}
+                            <span class="badge badge-secondary"><i class="bi bi-search"></i> Nao encontrado</span>
+                        {% elif log.status == 'group' %}
+                            <span class="badge badge-group"><i class="bi bi-people"></i> Grupo</span>
+                        {% elif log.status == 'skipped' %}
+                            <span class="badge badge-skipped"><i class="bi bi-skip-forward"></i> Pulado</span>
+                        {% else %}
+                            <span class="badge badge-error"><i class="bi bi-x-lg"></i> Erro</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if log.error_msg %}
+                        <small class="text-danger text-truncate d-inline-block" style="max-width: 150px;" title="{{ log.error_msg }}">
+                            {{ log.error_msg }}
+                        </small>
+                        {% else %}
+                        <span class="text-muted">-</span>
+                        {% endif %}
                     </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="7" class="text-center text-muted py-5">Nenhum log encontrado</td></tr>
+                <tr>
+                    <td colspan="7" class="text-center py-5 text-muted">
+                        <i class="bi bi-inbox fs-1 d-block mb-2 opacity-50"></i>
+                        Nenhum log encontrado
+                    </td>
+                </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
 
-<!-- Paginacao simples -->
+<!-- Paginacao -->
 {% if total_pages > 1 %}
-<nav class="mt-3">
+<nav class="mb-4">
     <ul class="pagination justify-content-center">
-        {% for p in range(1, total_pages + 1) %}
-        <li class="page-item {% if p == page %}active{% endif %}">
-            <a class="page-link" href="?page={{ p }}&client_id={{ selected_client or '' }}&status={{ selected_status or '' }}">{{ p }}</a>
+        {% if page > 1 %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page - 1 }}&client_id={{ selected_client or '' }}&status={{ selected_status or '' }}">
+                <i class="bi bi-chevron-left"></i>
+            </a>
         </li>
+        {% endif %}
+        {% for p in range(1, total_pages + 1) %}
+            {% if p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
+            <li class="page-item {% if p == page %}active{% endif %}">
+                <a class="page-link" href="?page={{ p }}&client_id={{ selected_client or '' }}&status={{ selected_status or '' }}">{{ p }}</a>
+            </li>
+            {% elif p == page - 3 or p == page + 3 %}
+            <li class="page-item disabled"><span class="page-link">...</span></li>
+            {% endif %}
         {% endfor %}
+        {% if page < total_pages %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page + 1 }}&client_id={{ selected_client or '' }}&status={{ selected_status or '' }}">
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </li>
+        {% endif %}
     </ul>
 </nav>
 {% endif %}
+
+<!-- Server Logs Terminal -->
+<div class="card">
+    <div class="card-header bg-dark text-white py-2 d-flex justify-content-between align-items-center">
+        <div>
+            <i class="bi bi-terminal"></i> <span class="fw-bold">Logs do Servidor</span>
+            <small class="text-white-50 ms-2">app.log</small>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-success" id="terminal-status">
+                <i class="bi bi-circle-fill"></i> Live
+            </span>
+            <button class="btn btn-sm btn-outline-light" id="btn-clear" title="Limpar">
+                <i class="bi bi-trash"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-light" id="btn-pause" title="Pausar/Continuar">
+                <i class="bi bi-pause-fill" id="pause-icon"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-light" id="btn-scroll" title="Scroll automatico">
+                <i class="bi bi-arrow-down-circle"></i>
+            </button>
+        </div>
+    </div>
+    <div class="terminal-container">
+        <pre id="terminal-output" class="terminal-output"></pre>
+    </div>
+    <div class="card-footer bg-dark text-white-50 py-1 d-flex justify-content-between">
+        <small><span id="line-count">0</span> linhas</small>
+        <small>Atualiza a cada 2s</small>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.terminal-container {
+    background-color: #1e1e1e;
+    height: 400px;
+    overflow: hidden;
+}
+.terminal-output {
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.4;
+    color: #d4d4d4;
+    background-color: #1e1e1e;
+    margin: 0;
+    padding: 12px;
+    height: 100%;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+.terminal-output::-webkit-scrollbar {
+    width: 8px;
+}
+.terminal-output::-webkit-scrollbar-track {
+    background: #2d2d2d;
+}
+.terminal-output::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 4px;
+}
+.terminal-output::-webkit-scrollbar-thumb:hover {
+    background: #666;
+}
+/* Log level colors */
+.log-info { color: #4fc1ff; }
+.log-warning { color: #ffcc00; }
+.log-error { color: #f14c4c; }
+.log-success { color: #89d185; }
+.log-debug { color: #b5b5b5; }
+.log-timestamp { color: #6a9955; }
+.log-client { color: #ce9178; }
+
+.bg-primary-subtle { background-color: #eff6ff; }
+.bg-success-subtle { background-color: #f0fdf4; }
+.bg-danger-subtle { background-color: #fef2f2; }
+.bg-warning-subtle { background-color: #fffbeb; }
+.bg-info-subtle { background-color: #f0f9ff; }
+.bg-secondary-subtle { background-color: #f9fafb; }
+.text-primary { color: #3b82f6 !important; }
+.text-success { color: #22c55e !important; }
+.text-danger { color: #ef4444 !important; }
+.text-warning { color: #f59e0b !important; }
+.text-info { color: #0ea5e9 !important; }
+
+.table th {
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #6b7280;
+    border-bottom: none;
+}
+</style>
+
+<script>
+const REFRESH_INTERVAL = 2000;
+let isPaused = false;
+let autoScroll = true;
+let sessionId = 'session_' + Date.now();
+let lineCount = 0;
+
+const terminal = document.getElementById('terminal-output');
+const lineCountEl = document.getElementById('line-count');
+const statusEl = document.getElementById('terminal-status');
+const pauseIcon = document.getElementById('pause-icon');
+
+function colorizeLog(line) {
+    // Highlight timestamp
+    line = line.replace(/(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+)/g, '<span class="log-timestamp">$1</span>');
+
+    // Highlight log levels
+    line = line.replace(/\| INFO \|/g, '| <span class="log-info">INFO</span> |');
+    line = line.replace(/\| WARNING \|/g, '| <span class="log-warning">WARNING</span> |');
+    line = line.replace(/\| ERROR \|/g, '| <span class="log-error">ERROR</span> |');
+    line = line.replace(/\| DEBUG \|/g, '| <span class="log-debug">DEBUG</span> |');
+    line = line.replace(/\| SUCCESS \|/g, '| <span class="log-success">SUCCESS</span> |');
+
+    // Highlight client names in brackets
+    line = line.replace(/\[([^\]]+)\]/g, '[<span class="log-client">$1</span>]');
+
+    // Highlight success messages
+    if (line.includes('sucesso') || line.includes('success') || line.includes('enviada')) {
+        line = `<span class="log-success">${line}</span>`;
+    }
+
+    // Highlight errors
+    if (line.includes('erro') || line.includes('error') || line.includes('falha') || line.includes('failed')) {
+        line = `<span class="log-error">${line}</span>`;
+    }
+
+    return line;
+}
+
+function appendLogs(lines) {
+    if (lines.length === 0) return;
+
+    const fragment = document.createDocumentFragment();
+    lines.forEach(line => {
+        const div = document.createElement('div');
+        div.innerHTML = colorizeLog(line);
+        fragment.appendChild(div);
+    });
+
+    terminal.appendChild(fragment);
+    lineCount += lines.length;
+    lineCountEl.textContent = lineCount;
+
+    // Limita a 1000 linhas no terminal
+    while (terminal.children.length > 1000) {
+        terminal.removeChild(terminal.firstChild);
+    }
+
+    if (autoScroll) {
+        terminal.scrollTop = terminal.scrollHeight;
+    }
+}
+
+async function fetchLogs() {
+    if (isPaused) return;
+
+    try {
+        const response = await fetch(`/api/server/logs/stream?session=${sessionId}&lines=100`);
+        const data = await response.json();
+
+        if (data.error) {
+            console.error('Erro ao buscar logs:', data.error);
+            return;
+        }
+
+        if (data.lines && data.lines.length > 0) {
+            appendLogs(data.lines);
+        }
+
+        statusEl.innerHTML = '<i class="bi bi-circle-fill"></i> Live';
+        statusEl.className = 'badge bg-success';
+
+    } catch (error) {
+        console.error('Erro ao buscar logs:', error);
+        statusEl.innerHTML = '<i class="bi bi-exclamation-circle"></i> Erro';
+        statusEl.className = 'badge bg-danger';
+    }
+}
+
+// Clear button
+document.getElementById('btn-clear').addEventListener('click', () => {
+    terminal.innerHTML = '';
+    lineCount = 0;
+    lineCountEl.textContent = '0';
+});
+
+// Pause button
+document.getElementById('btn-pause').addEventListener('click', () => {
+    isPaused = !isPaused;
+    if (isPaused) {
+        pauseIcon.className = 'bi bi-play-fill';
+        statusEl.innerHTML = '<i class="bi bi-pause-circle"></i> Pausado';
+        statusEl.className = 'badge bg-warning';
+    } else {
+        pauseIcon.className = 'bi bi-pause-fill';
+        statusEl.innerHTML = '<i class="bi bi-circle-fill"></i> Live';
+        statusEl.className = 'badge bg-success';
+        fetchLogs();
+    }
+});
+
+// Auto-scroll button
+document.getElementById('btn-scroll').addEventListener('click', () => {
+    autoScroll = !autoScroll;
+    const btn = document.getElementById('btn-scroll');
+    if (autoScroll) {
+        btn.classList.remove('btn-light');
+        btn.classList.add('btn-outline-light');
+        terminal.scrollTop = terminal.scrollHeight;
+    } else {
+        btn.classList.remove('btn-outline-light');
+        btn.classList.add('btn-light');
+    }
+});
+
+// Detect manual scroll
+terminal.addEventListener('scroll', () => {
+    const isAtBottom = terminal.scrollHeight - terminal.scrollTop <= terminal.clientHeight + 50;
+    if (!isAtBottom && autoScroll) {
+        autoScroll = false;
+        document.getElementById('btn-scroll').classList.remove('btn-outline-light');
+        document.getElementById('btn-scroll').classList.add('btn-light');
+    }
+});
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    fetchLogs();
+    setInterval(fetchLogs, REFRESH_INTERVAL);
+});
+</script>
 {% endblock %}
