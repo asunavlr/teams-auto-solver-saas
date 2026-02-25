@@ -387,29 +387,41 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
     tem_imagem = any(ext in content_lower for ext in [".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"])
 
     if tem_pdf:
-        log("PDF encontrado, extraindo...", config.nome)
+        log("PDF encontrado, abrindo preview...", config.nome)
         try:
+            # Encontra e clica no PDF para abrir preview
             pdf_link = frame.locator('text=/.pdf/i').first
-            await pdf_link.click()
-            await asyncio.sleep(4)
+            await pdf_link.click(timeout=10000)
+            await asyncio.sleep(5)  # Espera o preview carregar
 
             for page_num in range(1, MAX_PDF_PAGES + 1):
                 ss_path = data_dir / f"pdf_novo_{page_num}.png"
                 await browser.page.screenshot(path=str(ss_path))
                 tarefa_info["screenshots"].append(str(ss_path))
+                log(f"  Screenshot {page_num} do PDF capturado", config.nome)
+
+                # Tenta ir para proxima pagina
                 try:
                     next_btn = browser.page.locator(
-                        'button[aria-label*="Next"], button[aria-label*="Próxim"], button[aria-label*="Proxim"]'
+                        'button[aria-label*="Next"], button[aria-label*="Próxim"], '
+                        'button[aria-label*="Proxim"], button[aria-label*="next"], '
+                        '[data-icon-name="ChevronRight"], button:has-text(">")'
                     ).first
                     await next_btn.click(timeout=2000)
                     await asyncio.sleep(1)
                 except Exception:
+                    # Nao tem mais paginas
                     break
 
             await fechar_preview(browser)
             frame = await recuperar_frame_tarefa(browser, frame, nome_tarefa)
         except Exception as e:
             log(f"  Erro ao processar PDF: {e}", config.nome)
+            # Tenta fechar qualquer preview aberto
+            try:
+                await fechar_preview(browser)
+            except Exception:
+                pass
 
     if tem_imagem:
         log("Imagem(ns) encontrada(s), extraindo...", config.nome)
