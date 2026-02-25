@@ -166,7 +166,7 @@
                         <tr>
                             <th class="ps-3">Cliente</th>
                             <th>Status</th>
-                            <th>Acao</th>
+                            <th>Plano</th>
                             <th class="text-center">Sucesso</th>
                             <th>Proximo</th>
                         </tr>
@@ -437,13 +437,26 @@ async function updateClientsStatus() {
             const rowClass = client.current_status === 'running' ? 'status-running' :
                            client.current_status === 'error' ? 'status-error' : '';
 
+            // Plan usage badge
+            let planBadge = '-';
+            if (client.plan_name) {
+                if (client.limite_atingido) {
+                    planBadge = `<span class="badge badge-error" title="Limite atingido">${client.tarefas_mes}/${client.limite_tarefas}</span>`;
+                } else if (client.limite_tarefas) {
+                    const usageClass = client.uso_percentual >= 90 ? 'badge-error' : client.uso_percentual >= 70 ? 'badge-warning' : 'badge-success';
+                    planBadge = `<span class="badge ${usageClass}" title="${client.plan_name}">${client.tarefas_mes}/${client.limite_tarefas}</span>`;
+                } else {
+                    planBadge = `<span class="badge badge-success" title="Ilimitado">${client.tarefas_mes}/∞</span>`;
+                }
+            }
+
             return `
                 <tr class="${rowClass}">
                     <td class="ps-3">
                         <a href="/clients/${client.id}" class="fw-medium text-decoration-none text-dark">${client.nome}</a>
                     </td>
                     <td>${getRuntimeBadge(client.current_status)}</td>
-                    <td><small class="text-truncate d-inline-block" style="max-width: 120px;">${client.current_action || '-'}</small></td>
+                    <td>${planBadge}</td>
                     <td class="text-center">
                         <span class="badge ${client.success_rate >= 80 ? 'badge-success' : client.success_rate >= 50 ? 'badge-warning' : 'badge-error'}">${client.success_rate}%</span>
                     </td>

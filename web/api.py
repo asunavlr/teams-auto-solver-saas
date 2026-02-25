@@ -128,6 +128,12 @@ def clients_status():
             "tasks_completed": client.tasks_completed,
             "success_rate": client_success_rate,
             "check_interval": client.check_interval,
+            # Plan info
+            "plan_name": client.plan.nome if client.plan else None,
+            "tarefas_mes": client.tarefas_mes,
+            "limite_tarefas": client.limite_tarefas,
+            "uso_percentual": client.uso_percentual,
+            "limite_atingido": client.limite_atingido,
         })
 
     return jsonify(result)

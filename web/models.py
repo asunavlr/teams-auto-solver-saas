@@ -25,6 +25,31 @@ def decrypt_value(value: str) -> str:
     return _get_fernet().decrypt(value.encode()).decode()
 
 
+class Plan(db.Model):
+    """Planos de assinatura."""
+    __tablename__ = "plans"
+
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(50), nullable=False)  # Básico, Premium, Ilimitado
+    preco_mensal = db.Column(db.Float, nullable=False)
+    preco_semestral = db.Column(db.Float, nullable=False)
+    limite_tarefas = db.Column(db.Integer, nullable=True)  # None = ilimitado
+    ativo = db.Column(db.Boolean, default=True)
+
+    @classmethod
+    def seed_plans(cls):
+        """Cria planos padrão se não existirem."""
+        plans_data = [
+            {"nome": "Básico", "preco_mensal": 60, "preco_semestral": 300, "limite_tarefas": 60},
+            {"nome": "Premium", "preco_mensal": 100, "preco_semestral": 500, "limite_tarefas": 120},
+            {"nome": "Ilimitado", "preco_mensal": 150, "preco_semestral": 750, "limite_tarefas": None},
+        ]
+        for data in plans_data:
+            if not cls.query.filter_by(nome=data["nome"]).first():
+                db.session.add(cls(**data))
+        db.session.commit()
+
+
 class Client(db.Model):
     __tablename__ = "clients"
 
@@ -37,7 +62,7 @@ class Client(db.Model):
     smtp_email = db.Column(db.String(200), default="")
     _smtp_password = db.Column("smtp_password", db.Text, default="")
     notification_email = db.Column(db.String(200), default="")
-    whatsapp = db.Column(db.String(20), default="")  # Numero para notificacoes WhatsApp
+    whatsapp = db.Column(db.String(20), default="")
     status = db.Column(db.String(20), default="active")
     expires_at = db.Column(db.DateTime, nullable=False)
     check_interval = db.Column(db.Integer, default=60)
@@ -45,8 +70,60 @@ class Client(db.Model):
     tasks_completed = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    # Plano e controle de uso
+    plan_id = db.Column(db.Integer, db.ForeignKey("plans.id"), nullable=True)
+    tarefas_mes = db.Column(db.Integer, default=0)  # Contador do mês atual
+    mes_contagem = db.Column(db.Integer, default=0)  # Mês do contador (1-12)
+
+    plan = db.relationship("Plan", backref="clients")
     task_logs = db.relationship("TaskLog", backref="client", lazy="dynamic")
     payments = db.relationship("Payment", backref="client", lazy="dynamic")
+
+    def verificar_reset_mensal(self):
+        """Reseta contador se mudou o mês."""
+        mes_atual = datetime.utcnow().month
+        if self.mes_contagem != mes_atual:
+            self.tarefas_mes = 0
+            self.mes_contagem = mes_atual
+            db.session.commit()
+
+    def incrementar_tarefa(self):
+        """Incrementa contador de tarefas do mês."""
+        self.verificar_reset_mensal()
+        self.tarefas_mes += 1
+        self.tasks_completed += 1
+        db.session.commit()
+
+    @property
+    def limite_tarefas(self):
+        """Retorna limite de tarefas do plano."""
+        if self.plan:
+            return self.plan.limite_tarefas
+        return None  # Sem plano = sem limite (legado)
+
+    @property
+    def tarefas_restantes(self):
+        """Retorna quantas tarefas ainda pode fazer este mês."""
+        self.verificar_reset_mensal()
+        if self.limite_tarefas is None:
+            return None  # Ilimitado
+        return max(0, self.limite_tarefas - self.tarefas_mes)
+
+    @property
+    def limite_atingido(self):
+        """Verifica se atingiu o limite de tarefas."""
+        if self.limite_tarefas is None:
+            return False
+        self.verificar_reset_mensal()
+        return self.tarefas_mes >= self.limite_tarefas
+
+    @property
+    def uso_percentual(self):
+        """Retorna percentual de uso do plano."""
+        if self.limite_tarefas is None or self.limite_tarefas == 0:
+            return 0
+        self.verificar_reset_mensal()
+        return min(100, int((self.tarefas_mes / self.limite_tarefas) * 100))
 
     @property
     def teams_password(self):

@@ -8,7 +8,7 @@ from flask_login import login_required
 
 import config as cfg
 from web import db
-from web.models import Client, TaskLog, Payment
+from web.models import Client, TaskLog, Payment, Plan
 
 main_bp = Blueprint("main", __name__)
 
@@ -89,6 +89,7 @@ def clients():
 def client_add():
     if request.method == "POST":
         months = int(request.form.get("months", 1))
+        plan_id = request.form.get("plan_id", type=int)
 
         client = Client(
             nome=request.form["nome"],
@@ -103,6 +104,8 @@ def client_add():
             check_interval=int(request.form.get("check_interval", 60)),
             expires_at=datetime.utcnow() + timedelta(days=30 * months),
             status="active",
+            plan_id=plan_id,
+            mes_contagem=datetime.utcnow().month,
         )
         db.session.add(client)
         db.session.flush()
@@ -132,7 +135,8 @@ def client_add():
         flash(f"Cliente {client.nome} cadastrado com sucesso!", "success")
         return redirect(url_for("main.client_detail", client_id=client.id))
 
-    return render_template("client_form.html", client=None)
+    plans = Plan.query.filter_by(ativo=True).all()
+    return render_template("client_form.html", client=None, plans=plans)
 
 
 @main_bp.route("/clients/<int:client_id>")
@@ -163,6 +167,7 @@ def client_edit(client_id):
         client.smtp_email = request.form.get("smtp_email", "")
         client.notification_email = request.form.get("notification_email", "")
         client.whatsapp = request.form.get("whatsapp", "")
+        client.plan_id = request.form.get("plan_id", type=int)
 
         # So atualiza senhas se preenchidas
         if request.form.get("teams_password"):
@@ -176,7 +181,8 @@ def client_edit(client_id):
         flash(f"Cliente {client.nome} atualizado!", "success")
         return redirect(url_for("main.client_detail", client_id=client.id))
 
-    return render_template("client_form.html", client=client)
+    plans = Plan.query.filter_by(ativo=True).all()
+    return render_template("client_form.html", client=client, plans=plans)
 
 
 @main_bp.route("/clients/<int:client_id>/toggle", methods=["POST"])

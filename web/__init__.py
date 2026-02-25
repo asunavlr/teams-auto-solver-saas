@@ -29,6 +29,8 @@ def create_app():
 
     with app.app_context():
         from web import models  # noqa: F401
+        from web.models import Plan
         db.create_all()
+        Plan.seed_plans()  # Cria planos padrão
 
     return app

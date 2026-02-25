@@ -88,6 +88,48 @@
     </div>
 </div>
 
+<!-- Plan Usage Card -->
+{% if client.plan %}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-3">
+        <div class="d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center">
+                <div class="rounded-circle bg-primary bg-opacity-10 p-2 me-3">
+                    <i class="bi bi-award-fill text-primary fs-5"></i>
+                </div>
+                <div>
+                    <h6 class="fw-bold m-0">{{ client.plan.nome }}</h6>
+                    <small class="text-muted">R${{ "%.0f"|format(client.plan.preco_mensal) }}/mes</small>
+                </div>
+            </div>
+            <div class="text-end" style="min-width: 200px;">
+                <div class="d-flex align-items-center justify-content-end mb-1">
+                    <span class="fw-bold {% if client.uso_percentual >= 90 %}text-danger{% elif client.uso_percentual >= 70 %}text-warning{% else %}text-success{% endif %}">
+                        {{ client.tarefas_mes }}
+                    </span>
+                    <span class="text-muted mx-1">/</span>
+                    <span class="text-muted">{% if client.limite_tarefas %}{{ client.limite_tarefas }}{% else %}∞{% endif %}</span>
+                    <small class="text-muted ms-2">tarefas este mes</small>
+                </div>
+                {% if client.limite_tarefas %}
+                <div class="progress" style="height: 8px; width: 200px;">
+                    <div class="progress-bar {% if client.uso_percentual >= 90 %}bg-danger{% elif client.uso_percentual >= 70 %}bg-warning{% else %}bg-success{% endif %}"
+                         style="width: {{ client.uso_percentual }}%"></div>
+                </div>
+                {% if client.limite_atingido %}
+                <small class="text-danger"><i class="bi bi-exclamation-triangle"></i> Limite atingido</small>
+                {% elif client.tarefas_restantes is not none and client.tarefas_restantes <= 10 %}
+                <small class="text-warning"><i class="bi bi-exclamation-circle"></i> {{ client.tarefas_restantes }} restantes</small>
+                {% endif %}
+                {% else %}
+                <small class="text-success"><i class="bi bi-infinity"></i> Ilimitado</small>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Quick Actions -->
 <div class="card border-0 shadow-sm mb-4">
     <div class="card-body py-3">

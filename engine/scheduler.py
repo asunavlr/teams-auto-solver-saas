@@ -125,6 +125,12 @@ def _execute_client(client_id: int):
                 _update_client_status(app, client_id, "idle", "Cliente inativo")
                 return
 
+            # Verifica limite de tarefas do plano
+            if client.limite_atingido:
+                logger.info(f"Cliente {client.nome} atingiu limite de tarefas ({client.tarefas_mes}/{client.limite_tarefas})")
+                _update_client_status(app, client_id, "idle", f"Limite atingido: {client.tarefas_mes}/{client.limite_tarefas} tarefas")
+                return
+
             config = _build_client_config(client)
             client_nome = client.nome
 
@@ -153,7 +159,7 @@ def _execute_client(client_id: int):
                 )
                 db.session.add(task_log)
                 if task.get("status") == "success":
-                    client.tasks_completed += 1
+                    client.incrementar_tarefa()  # Incrementa contador do plano
 
             db.session.commit()
 
