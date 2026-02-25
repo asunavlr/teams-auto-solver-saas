@@ -17,7 +17,13 @@ INSTANCE_DIR.mkdir(exist_ok=True)
 
 # Flask
 SECRET_KEY = os.getenv("SECRET_KEY", "change-me-in-production")
-DATABASE_URI = f"sqlite:///{INSTANCE_DIR / 'database.db'}"
+
+# Database: Supabase (PostgreSQL) ou SQLite local
+# Para Supabase: postgresql://postgres:[SENHA]@db.[PROJECT].supabase.co:5432/postgres
+DATABASE_URI = os.getenv("DATABASE_URI", f"sqlite:///{INSTANCE_DIR / 'database.db'}")
+
+# Redis (para Celery)
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 
 # Admin
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")

@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: teams-app
+    ports:
+      - "5000:5000"
+    environment:
+      - DATABASE_URI=${DATABASE_URI}
+      - REDIS_URL=redis://redis:6379
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - SECRET_KEY=${SECRET_KEY}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET}
+      - TIMEZONE=${TIMEZONE:-America/Sao_Paulo}
+      - DEFAULT_CHECK_INTERVAL=${DEFAULT_CHECK_INTERVAL:-60}
+      - UAZAPI_URL=${UAZAPI_URL:-}
+      - UAZAPI_TOKEN=${UAZAPI_TOKEN:-}
+      - ADMIN_WHATSAPP=${ADMIN_WHATSAPP:-}
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    networks:
+      - teams-network
+
+  worker:
+    build: .
+    container_name: teams-worker
+    command: celery -A tasks worker --concurrency=2 --loglevel=info
+    environment:
+      - DATABASE_URI=${DATABASE_URI}
+      - REDIS_URL=redis://redis:6379
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - SECRET_KEY=${SECRET_KEY}
+      - TIMEZONE=${TIMEZONE:-America/Sao_Paulo}
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+      app:
+        condition: service_healthy
+    restart: always
+    networks:
+      - teams-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: teams-redis
+    restart: always
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - teams-network
+
+volumes:
+  redis_data:
+
+networks:
+  teams-network:
+    driver: bridge

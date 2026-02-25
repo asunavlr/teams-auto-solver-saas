@@ -13,6 +13,13 @@ from web.models import Client, TaskLog, Payment, Plan
 main_bp = Blueprint("main", __name__)
 
 
+@main_bp.route("/health")
+def health():
+    """Health check simples (sem autenticacao) para Docker/monitoring."""
+    from flask import jsonify
+    return jsonify({"status": "ok", "timestamp": datetime.utcnow().isoformat()})
+
+
 def get_today_start():
     """Retorna inicio do dia no fuso horario local."""
     try:

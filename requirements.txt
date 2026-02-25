@@ -4,8 +4,13 @@ flask-sqlalchemy>=3.1
 flask-login>=0.6
 flask-wtf>=1.2
 
-# Scheduler
+# Database
+psycopg2-binary>=2.9  # PostgreSQL (Supabase)
+
+# Scheduler & Tasks
 apscheduler>=3.10
+celery>=5.3
+redis>=5.0
 
 # Automacao
 playwright>=1.49
@@ -22,3 +27,4 @@ cryptography>=42.0
 # Utilidades
 python-dotenv>=1.0
 loguru>=0.7
+psutil>=5.9

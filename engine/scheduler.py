@@ -1,9 +1,14 @@
 """
 Scheduler multi-cliente com APScheduler.
 Gerencia jobs de monitoramento por cliente.
+
+Suporta dois modos:
+- Celery (padrao com Docker): tarefas enviadas para workers paralelos
+- Local (fallback): execucao serial no mesmo processo
 """
 
 import asyncio
+import os
 import threading
 import queue
 from datetime import datetime
@@ -17,6 +22,9 @@ _lock = threading.Lock()
 _running_client = None
 _pending_queue = queue.Queue()  # Fila de clientes aguardando execucao
 _queue_processor_running = False
+
+# Modo de execucao: "celery" ou "local"
+EXECUTION_MODE = os.getenv("EXECUTION_MODE", "celery" if os.getenv("REDIS_URL") else "local")
 
 
 def _get_app_context():
@@ -200,9 +208,20 @@ def _execute_client(client_id: int):
 
 
 def _run_client_sync(client_id: int):
-    """Agenda execucao de um cliente (adiciona na fila se necessario)."""
+    """Agenda execucao de um cliente (Celery ou fila local)."""
     global _running_client
 
+    # Modo Celery: envia para worker
+    if EXECUTION_MODE == "celery":
+        try:
+            from tasks import executar_cliente
+            executar_cliente.delay(client_id)
+            logger.info(f"[Celery] Tarefa enviada para cliente {client_id}")
+            return
+        except Exception as e:
+            logger.warning(f"Celery indisponivel, usando modo local: {e}")
+
+    # Modo local: fila serial
     with _lock:
         if _running_client is not None:
             # Verifica se ja esta na fila para evitar duplicatas

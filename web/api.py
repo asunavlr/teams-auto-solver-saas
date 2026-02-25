@@ -19,6 +19,80 @@ api_bp = Blueprint("api", __name__, url_prefix="/api")
 _log_positions = {}
 
 
+# ============================================
+# HEALTH CHECK (sem autenticacao)
+# ============================================
+
+@api_bp.route("/health")
+def health_check():
+    """
+    Health check endpoint para monitoramento.
+    Verifica: banco de dados, scheduler, redis (se disponivel).
+    """
+    import psutil
+
+    checks = {}
+    healthy = True
+
+    # Check: Database
+    try:
+        db.session.execute(db.text("SELECT 1"))
+        checks["database"] = {"status": "ok"}
+    except Exception as e:
+        checks["database"] = {"status": "error", "message": str(e)[:100]}
+        healthy = False
+
+    # Check: Scheduler
+    try:
+        from engine.scheduler import scheduler
+        if scheduler.running:
+            checks["scheduler"] = {"status": "ok", "jobs": len(scheduler.get_jobs())}
+        else:
+            checks["scheduler"] = {"status": "error", "message": "Scheduler not running"}
+            healthy = False
+    except Exception as e:
+        checks["scheduler"] = {"status": "error", "message": str(e)[:100]}
+        healthy = False
+
+    # Check: Redis (opcional)
+    try:
+        import redis
+        r = redis.from_url(cfg.REDIS_URL)
+        r.ping()
+        checks["redis"] = {"status": "ok"}
+    except Exception as e:
+        # Redis e opcional (modo local funciona sem)
+        checks["redis"] = {"status": "unavailable", "message": str(e)[:50]}
+
+    # Check: Disk space
+    try:
+        disk = psutil.disk_usage("/")
+        free_gb = disk.free / (1024 * 1024 * 1024)
+        if free_gb < 1:
+            checks["disk"] = {"status": "warning", "free_gb": round(free_gb, 2)}
+        else:
+            checks["disk"] = {"status": "ok", "free_gb": round(free_gb, 2)}
+    except Exception:
+        checks["disk"] = {"status": "unknown"}
+
+    # Check: Memory
+    try:
+        memory = psutil.virtual_memory()
+        if memory.percent > 90:
+            checks["memory"] = {"status": "warning", "percent": memory.percent}
+            healthy = False
+        else:
+            checks["memory"] = {"status": "ok", "percent": memory.percent}
+    except Exception:
+        checks["memory"] = {"status": "unknown"}
+
+    return jsonify({
+        "status": "healthy" if healthy else "unhealthy",
+        "timestamp": datetime.utcnow().isoformat(),
+        "checks": checks
+    }), 200 if healthy else 503
+
+
 def get_local_now():
     """Retorna datetime atual no fuso horario configurado."""
     try:

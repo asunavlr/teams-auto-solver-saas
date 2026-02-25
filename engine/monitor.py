@@ -26,8 +26,12 @@ from engine.solver import (
     FORMATOS_CODIGO,
 )
 from engine.notifier import EmailNotifier
+from engine.agent import TeamsAgent
 
 MAX_PDF_PAGES = 15
+
+# Agente global (inicializado por cliente)
+_current_agent: TeamsAgent = None
 
 
 class ClientConfig:
@@ -80,24 +84,35 @@ def salvar_processadas(processadas: set, path: Path):
         json.dump(list(processadas), f)
 
 
-async def verificar_activity(browser, data_dir: Path, client_name: str = "", max_tentativas: int = 3) -> list:
+async def verificar_activity(browser, data_dir: Path, client_name: str = "", max_tentativas: int = 3, agent: TeamsAgent = None) -> list:
     """Verifica a aba Activity e retorna novas atividades.
 
     Se não encontrar atividades, tenta novamente até max_tentativas vezes,
     esperando 10 segundos entre cada tentativa.
+
+    Args:
+        agent: TeamsAgent opcional para navegacao resiliente (fallback para Vision)
     """
     log("Acessando Activity...", client_name)
 
-    try:
-        activity_btn = browser.page.locator('button:has-text("Activity")').first
-        await activity_btn.click(timeout=5000)
-    except Exception:
+    # Usa o agente se disponivel (com fallback inteligente)
+    if agent:
+        clicked = await agent.clicar("atividade")
+        if not clicked:
+            log("Falha ao clicar em Activity via agente", client_name)
+            return []
+    else:
+        # Fallback: tentativa manual com seletores CSS
         try:
-            activity_btn = browser.page.locator('button:has-text("Atividade")').first
+            activity_btn = browser.page.locator('button:has-text("Activity")').first
             await activity_btn.click(timeout=5000)
         except Exception:
-            activity_btn = browser.page.locator('[aria-label*="Activity"], [aria-label*="Atividade"]').first
-            await activity_btn.click(timeout=5000)
+            try:
+                activity_btn = browser.page.locator('button:has-text("Atividade")').first
+                await activity_btn.click(timeout=5000)
+            except Exception:
+                activity_btn = browser.page.locator('[aria-label*="Activity"], [aria-label*="Atividade"]').first
+                await activity_btn.click(timeout=5000)
 
     for tentativa in range(1, max_tentativas + 1):
         # Espera inicial maior na primeira tentativa, 10s nas seguintes
@@ -778,6 +793,8 @@ async def ciclo_monitoramento_cliente(config: ClientConfig) -> dict:
     Executa um ciclo de monitoramento para um cliente.
     Retorna dict com resultados: {success: int, error: int, tasks: list}
     """
+    global _current_agent
+
     resultado = {"success": 0, "error": 0, "tasks": []}
 
     log(f"Iniciando ciclo de monitoramento", config.nome)
@@ -789,6 +806,10 @@ async def ciclo_monitoramento_cliente(config: ClientConfig) -> dict:
         teams_password=config.teams_password,
     )
     await browser.start(headless=True)
+
+    # Cria agente de navegacao inteligente
+    agent = TeamsAgent(browser.page, config.anthropic_key)
+    _current_agent = agent
 
     try:
         log("Conectando ao Teams...", config.nome)
@@ -817,7 +838,7 @@ async def ciclo_monitoramento_cliente(config: ClientConfig) -> dict:
 
         processadas = carregar_processadas(config.processadas_path)
         update_client_status(config.client_id, "running", "Verificando atividades...")
-        atividades = await verificar_activity(browser, config.data_dir, config.nome)
+        atividades = await verificar_activity(browser, config.data_dir, config.nome, agent=agent)
         novas = [a for a in atividades if a.get("id") not in processadas]
 
         if not novas:
@@ -875,6 +896,12 @@ async def ciclo_monitoramento_cliente(config: ClientConfig) -> dict:
             update_client_status(config.client_id, "idle", f"Ciclo concluido: {resultado['success']} tarefas")
         else:
             update_client_status(config.client_id, "error", "", f"{resultado['error']} erro(s)")
+
+    # Log das estatisticas do agente
+    if agent:
+        stats = agent.get_stats()
+        if stats["vision_calls"] > 0:
+            log(f"Agente usou Vision {stats['vision_calls']}x (custo estimado: R${stats['estimated_cost']:.2f})", config.nome)
 
     log(f"Ciclo finalizado: {resultado['success']} ok, {resultado['error']} erros", config.nome)
     return resultado
