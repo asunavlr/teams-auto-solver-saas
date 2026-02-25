@@ -38,23 +38,45 @@ def get_today_start():
 @api_bp.route("/dashboard/stats")
 @login_required
 def dashboard_stats():
-    """Retorna estatisticas do dashboard."""
+    """Retorna estatisticas expandidas do dashboard."""
     today_start = get_today_start()
-    # Remove timezone para comparar com datetime naive do banco
     today_start_naive = today_start.replace(tzinfo=None)
+    week_start = today_start_naive - timedelta(days=7)
+    month_start = today_start_naive - timedelta(days=30)
 
     all_clients = Client.query.all()
+
+    # Contagens basicas
+    tasks_today = TaskLog.query.filter(TaskLog.created_at >= today_start_naive).count()
+    tasks_week = TaskLog.query.filter(TaskLog.created_at >= week_start).count()
+    tasks_month = TaskLog.query.filter(TaskLog.created_at >= month_start).count()
+
+    # Taxa de sucesso
+    success_count = TaskLog.query.filter(TaskLog.status == "success").count()
+    total_tasks = TaskLog.query.count()
+    success_rate = round((success_count / total_tasks * 100) if total_tasks > 0 else 0, 1)
+
+    # Erros recentes (ultimas 24h)
+    errors_24h = TaskLog.query.filter(
+        TaskLog.created_at >= today_start_naive - timedelta(hours=24),
+        TaskLog.status == "error"
+    ).count()
+
+    # Media por dia (ultimos 30 dias)
+    avg_per_day = round(tasks_month / 30, 1) if tasks_month > 0 else 0
 
     stats = {
         "total_clients": len(all_clients),
         "active_clients": sum(1 for c in all_clients if c.is_active),
         "expired_clients": sum(1 for c in all_clients if c.is_expired),
-        "tasks_today": TaskLog.query.filter(
-            TaskLog.created_at >= today_start_naive
-        ).count(),
-        "tasks_week": TaskLog.query.filter(
-            TaskLog.created_at >= today_start_naive - timedelta(days=7)
-        ).count(),
+        "paused_clients": sum(1 for c in all_clients if c.status == "paused"),
+        "tasks_today": tasks_today,
+        "tasks_week": tasks_week,
+        "tasks_month": tasks_month,
+        "total_tasks": total_tasks,
+        "success_rate": success_rate,
+        "errors_24h": errors_24h,
+        "avg_per_day": avg_per_day,
     }
 
     return jsonify(stats)
@@ -64,6 +86,8 @@ def dashboard_stats():
 @login_required
 def clients_status():
     """Retorna status de todos os clientes."""
+    from engine.scheduler import scheduler
+
     clients = Client.query.all()
     result = []
 
@@ -73,6 +97,20 @@ def clients_status():
         last_task = TaskLog.query.filter_by(client_id=client.id)\
             .order_by(TaskLog.created_at.desc()).first()
 
+        # Calcula taxa de sucesso do cliente
+        client_total = TaskLog.query.filter_by(client_id=client.id).count()
+        client_success = TaskLog.query.filter_by(client_id=client.id, status="success").count()
+        client_success_rate = round((client_success / client_total * 100) if client_total > 0 else 0, 1)
+
+        # Proximo check agendado
+        next_check = None
+        try:
+            job = scheduler.get_job(f"client_{client.id}")
+            if job and job.next_run_time:
+                next_check = job.next_run_time.strftime("%H:%M")
+        except Exception:
+            pass
+
         result.append({
             "id": client.id,
             "nome": client.nome,
@@ -81,12 +119,15 @@ def clients_status():
             "current_status": status_info.status if status_info else "idle",
             "current_action": status_info.current_action if status_info else None,
             "last_check": client.last_check.isoformat() if client.last_check else None,
+            "next_check": next_check,
             "last_task": {
                 "name": last_task.task_name,
                 "status": last_task.status,
                 "time": last_task.created_at.isoformat()
             } if last_task else None,
             "tasks_completed": client.tasks_completed,
+            "success_rate": client_success_rate,
+            "check_interval": client.check_interval,
         })
 
     return jsonify(result)
@@ -162,7 +203,7 @@ def recent_logs():
 @login_required
 def activity_timeline():
     """Retorna timeline de atividade por hora (ultimas 24h)."""
-    now = datetime.utcnow()
+    now = get_local_now().replace(tzinfo=None)
     start = now - timedelta(hours=24)
 
     logs = TaskLog.query.filter(TaskLog.created_at >= start).all()
@@ -186,6 +227,144 @@ def activity_timeline():
         {"hour": k, **v}
         for k, v in sorted(hours.items())
     ])
+
+
+@api_bp.route("/activity/daily")
+@login_required
+def activity_daily():
+    """Retorna atividade por dia (ultimos 7 dias)."""
+    today = get_today_start().replace(tzinfo=None)
+
+    days = []
+    for i in range(7):
+        day_start = today - timedelta(days=i)
+        day_end = day_start + timedelta(days=1)
+
+        success = TaskLog.query.filter(
+            TaskLog.created_at >= day_start,
+            TaskLog.created_at < day_end,
+            TaskLog.status == "success"
+        ).count()
+
+        errors = TaskLog.query.filter(
+            TaskLog.created_at >= day_start,
+            TaskLog.created_at < day_end,
+            TaskLog.status == "error"
+        ).count()
+
+        other = TaskLog.query.filter(
+            TaskLog.created_at >= day_start,
+            TaskLog.created_at < day_end,
+            TaskLog.status.notin_(["success", "error"])
+        ).count()
+
+        days.append({
+            "date": day_start.strftime("%d/%m"),
+            "weekday": ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"][day_start.weekday()],
+            "success": success,
+            "errors": errors,
+            "other": other,
+            "total": success + errors + other
+        })
+
+    return jsonify(list(reversed(days)))
+
+
+@api_bp.route("/system/status")
+@login_required
+def system_status():
+    """Retorna status do sistema."""
+    import psutil
+    import os
+
+    # Uptime do processo
+    try:
+        import time
+        process = psutil.Process(os.getpid())
+        uptime_seconds = time.time() - process.create_time()
+        uptime_hours = int(uptime_seconds // 3600)
+        uptime_minutes = int((uptime_seconds % 3600) // 60)
+        uptime = f"{uptime_hours}h {uptime_minutes}m"
+    except Exception:
+        uptime = "N/A"
+
+    # Memoria
+    try:
+        memory = psutil.virtual_memory()
+        memory_used = round(memory.used / (1024 * 1024 * 1024), 1)
+        memory_total = round(memory.total / (1024 * 1024 * 1024), 1)
+        memory_percent = memory.percent
+    except Exception:
+        memory_used = memory_total = memory_percent = 0
+
+    # CPU
+    try:
+        cpu_percent = psutil.cpu_percent(interval=0.1)
+    except Exception:
+        cpu_percent = 0
+
+    # Scheduler status
+    try:
+        from engine.scheduler import scheduler
+        scheduler_running = scheduler.running
+        scheduler_jobs = len(scheduler.get_jobs())
+    except Exception:
+        scheduler_running = False
+        scheduler_jobs = 0
+
+    return jsonify({
+        "uptime": uptime,
+        "memory_used_gb": memory_used,
+        "memory_total_gb": memory_total,
+        "memory_percent": memory_percent,
+        "cpu_percent": cpu_percent,
+        "scheduler_running": scheduler_running,
+        "scheduler_jobs": scheduler_jobs
+    })
+
+
+@api_bp.route("/errors/recent")
+@login_required
+def recent_errors():
+    """Retorna erros recentes."""
+    limit = request.args.get("limit", 10, type=int)
+
+    errors = TaskLog.query.filter(
+        TaskLog.status == "error"
+    ).order_by(TaskLog.created_at.desc()).limit(limit).all()
+
+    return jsonify([{
+        "id": e.id,
+        "client_name": e.client.nome,
+        "task_name": e.task_name,
+        "error_msg": e.error_msg,
+        "created_at": e.created_at.isoformat()
+    } for e in errors])
+
+
+@api_bp.route("/scheduler/jobs")
+@login_required
+def scheduler_jobs():
+    """Retorna jobs agendados no scheduler."""
+    try:
+        from engine.scheduler import scheduler
+
+        jobs = []
+        for job in scheduler.get_jobs():
+            next_run = job.next_run_time
+            jobs.append({
+                "id": job.id,
+                "name": job.name,
+                "next_run": next_run.isoformat() if next_run else None,
+                "next_run_formatted": next_run.strftime("%d/%m %H:%M") if next_run else "N/A"
+            })
+
+        return jsonify({
+            "running": scheduler.running,
+            "jobs": jobs
+        })
+    except Exception as e:
+        return jsonify({"running": False, "jobs": [], "error": str(e)})
 
 
 @api_bp.route("/server/logs")

@@ -5,61 +5,89 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h4 class="fw-bold m-0">Logs de Execucao</h4>
-        <small class="text-muted">Historico de tarefas processadas</small>
+        <small class="text-muted">{{ total }} registro(s) encontrado(s)</small>
     </div>
-    <form method="GET" class="d-flex gap-2">
-        <select name="client_id" class="form-select form-select-sm" style="width: 200px;">
-            <option value="">Todos os clientes</option>
-            {% for c in all_clients %}
-                <option value="{{ c.id }}" {% if selected_client == c.id %}selected{% endif %}>{{ c.nome }}</option>
-            {% endfor %}
-        </select>
-        <select name="status" class="form-select form-select-sm" style="width: 140px;">
-            <option value="">Todos status</option>
-            <option value="success" {% if selected_status == 'success' %}selected{% endif %}>Enviado</option>
-            <option value="not_found" {% if selected_status == 'not_found' %}selected{% endif %}>Nao encontrado</option>
-            <option value="group" {% if selected_status == 'group' %}selected{% endif %}>Grupo</option>
-            <option value="skipped" {% if selected_status == 'skipped' %}selected{% endif %}>Pulado</option>
-            <option value="error" {% if selected_status == 'error' %}selected{% endif %}>Erro</option>
-        </select>
-        <button class="btn btn-sm btn-primary"><i class="bi bi-search"></i> Filtrar</button>
-    </form>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('main.logs_export', client_id=selected_client or '', status=selected_status or '', date_from=date_from or '', date_to=date_to or '') }}" class="btn btn-sm btn-outline-success">
+            <i class="bi bi-download"></i> Exportar CSV
+        </a>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body py-3">
+        <form method="GET" class="row g-2 align-items-end">
+            <div class="col-md-2">
+                <label class="form-label small text-muted mb-1">Cliente</label>
+                <select name="client_id" class="form-select form-select-sm">
+                    <option value="">Todos</option>
+                    {% for c in all_clients %}
+                        <option value="{{ c.id }}" {% if selected_client == c.id %}selected{% endif %}>{{ c.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted mb-1">Status</label>
+                <select name="status" class="form-select form-select-sm">
+                    <option value="">Todos</option>
+                    <option value="success" {% if selected_status == 'success' %}selected{% endif %}>Enviado</option>
+                    <option value="not_found" {% if selected_status == 'not_found' %}selected{% endif %}>Nao encontrado</option>
+                    <option value="group" {% if selected_status == 'group' %}selected{% endif %}>Grupo</option>
+                    <option value="skipped" {% if selected_status == 'skipped' %}selected{% endif %}>Pulado</option>
+                    <option value="error" {% if selected_status == 'error' %}selected{% endif %}>Erro</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted mb-1">De</label>
+                <input type="date" name="date_from" class="form-control form-control-sm" value="{{ date_from or '' }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted mb-1">Ate</label>
+                <input type="date" name="date_to" class="form-control form-control-sm" value="{{ date_to or '' }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small text-muted mb-1">Buscar tarefa</label>
+                <input type="text" name="q" class="form-control form-control-sm" placeholder="Nome da tarefa..." value="{{ search_query or '' }}">
+            </div>
+            <div class="col-md-1">
+                <button class="btn btn-sm btn-primary w-100"><i class="bi bi-search"></i></button>
+            </div>
+        </form>
+    </div>
 </div>
 
 <!-- Task Logs Table -->
 <div class="card mb-4">
-    <div class="card-header bg-white py-3">
-        <h6 class="fw-bold m-0"><i class="bi bi-list-check text-primary"></i> Historico de Tarefas</h6>
-    </div>
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
             <thead>
                 <tr class="bg-light">
-                    <th class="ps-4">Data</th>
-                    <th>Cliente</th>
+                    <th class="ps-3" style="width: 130px;">Data</th>
+                    <th style="width: 120px;">Cliente</th>
                     <th>Tarefa</th>
-                    <th>Disciplina</th>
-                    <th>Formato</th>
-                    <th>Status</th>
+                    <th style="width: 150px;">Disciplina</th>
+                    <th style="width: 80px;">Formato</th>
+                    <th style="width: 100px;">Status</th>
                     <th>Erro</th>
                 </tr>
             </thead>
             <tbody>
                 {% for log in logs %}
                 <tr>
-                    <td class="ps-4"><small class="text-muted">{{ log.created_at.strftime('%d/%m/%Y %H:%M') }}</small></td>
+                    <td class="ps-3"><small class="text-muted">{{ log.created_at.strftime('%d/%m/%Y %H:%M') }}</small></td>
                     <td>
                         <a href="{{ url_for('main.client_detail', client_id=log.client_id) }}" class="fw-medium text-decoration-none">
                             {{ log.client.nome }}
                         </a>
                     </td>
                     <td>
-                        <div class="text-truncate" style="max-width: 250px;" title="{{ log.task_name }}">
+                        <div class="text-truncate" style="max-width: 300px;" title="{{ log.task_name }}">
                             {{ log.task_name }}
                         </div>
                     </td>
                     <td>
-                        <small class="text-muted">{{ log.discipline[:30] if log.discipline else '-' }}</small>
+                        <small class="text-muted text-truncate d-inline-block" style="max-width: 140px;">{{ log.discipline or '-' }}</small>
                     </td>
                     <td>
                         {% if log.format %}
@@ -95,7 +123,7 @@
                     </td>
                     <td>
                         {% if log.error_msg %}
-                        <small class="text-danger text-truncate d-inline-block" style="max-width: 150px;" title="{{ log.error_msg }}">
+                        <small class="text-danger text-truncate d-inline-block" style="max-width: 200px;" title="{{ log.error_msg }}">
                             {{ log.error_msg }}
                         </small>
                         {% else %}
@@ -122,7 +150,7 @@
     <ul class="pagination justify-content-center">
         {% if page > 1 %}
         <li class="page-item">
-            <a class="page-link" href="?page={{ page - 1 }}&client_id={{ selected_client or '' }}&status={{ selected_status or '' }}">
+            <a class="page-link" href="?page={{ page - 1 }}&client_id={{ selected_client or '' }}&status={{ selected_status or '' }}&date_from={{ date_from or '' }}&date_to={{ date_to or '' }}&q={{ search_query or '' }}">
                 <i class="bi bi-chevron-left"></i>
             </a>
         </li>
@@ -130,7 +158,7 @@
         {% for p in range(1, total_pages + 1) %}
             {% if p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
             <li class="page-item {% if p == page %}active{% endif %}">
-                <a class="page-link" href="?page={{ p }}&client_id={{ selected_client or '' }}&status={{ selected_status or '' }}">{{ p }}</a>
+                <a class="page-link" href="?page={{ p }}&client_id={{ selected_client or '' }}&status={{ selected_status or '' }}&date_from={{ date_from or '' }}&date_to={{ date_to or '' }}&q={{ search_query or '' }}">{{ p }}</a>
             </li>
             {% elif p == page - 3 or p == page + 3 %}
             <li class="page-item disabled"><span class="page-link">...</span></li>
@@ -138,7 +166,7 @@
         {% endfor %}
         {% if page < total_pages %}
         <li class="page-item">
-            <a class="page-link" href="?page={{ page + 1 }}&client_id={{ selected_client or '' }}&status={{ selected_status or '' }}">
+            <a class="page-link" href="?page={{ page + 1 }}&client_id={{ selected_client or '' }}&status={{ selected_status or '' }}&date_from={{ date_from or '' }}&date_to={{ date_to or '' }}&q={{ search_query or '' }}">
                 <i class="bi bi-chevron-right"></i>
             </a>
         </li>
@@ -152,7 +180,7 @@
     <div class="card-header bg-dark text-white py-2 d-flex justify-content-between align-items-center">
         <div>
             <i class="bi bi-terminal"></i> <span class="fw-bold">Logs do Servidor</span>
-            <small class="text-white-50 ms-2">app.log</small>
+            <small class="text-white-50 ms-2">app.log (tempo real)</small>
         </div>
         <div class="d-flex align-items-center gap-2">
             <span class="badge bg-success" id="terminal-status">
@@ -183,41 +211,29 @@
 <style>
 .terminal-container {
     background-color: #1e1e1e;
-    height: 400px;
+    height: 350px;
     overflow: hidden;
 }
 .terminal-output {
     font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-    font-size: 12px;
+    font-size: 11px;
     line-height: 1.4;
     color: #d4d4d4;
     background-color: #1e1e1e;
     margin: 0;
-    padding: 12px;
+    padding: 10px;
     height: 100%;
     overflow-y: auto;
     white-space: pre-wrap;
     word-wrap: break-word;
 }
-.terminal-output::-webkit-scrollbar {
-    width: 8px;
-}
-.terminal-output::-webkit-scrollbar-track {
-    background: #2d2d2d;
-}
-.terminal-output::-webkit-scrollbar-thumb {
-    background: #555;
-    border-radius: 4px;
-}
-.terminal-output::-webkit-scrollbar-thumb:hover {
-    background: #666;
-}
-/* Log level colors */
+.terminal-output::-webkit-scrollbar { width: 8px; }
+.terminal-output::-webkit-scrollbar-track { background: #2d2d2d; }
+.terminal-output::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
 .log-info { color: #4fc1ff; }
 .log-warning { color: #ffcc00; }
 .log-error { color: #f14c4c; }
 .log-success { color: #89d185; }
-.log-debug { color: #b5b5b5; }
 .log-timestamp { color: #6a9955; }
 .log-client { color: #ce9178; }
 
@@ -225,17 +241,15 @@
 .bg-success-subtle { background-color: #f0fdf4; }
 .bg-danger-subtle { background-color: #fef2f2; }
 .bg-warning-subtle { background-color: #fffbeb; }
-.bg-info-subtle { background-color: #f0f9ff; }
 .bg-secondary-subtle { background-color: #f9fafb; }
 .text-primary { color: #3b82f6 !important; }
 .text-success { color: #22c55e !important; }
 .text-danger { color: #ef4444 !important; }
 .text-warning { color: #f59e0b !important; }
-.text-info { color: #0ea5e9 !important; }
 
 .table th {
     font-weight: 600;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: #6b7280;
@@ -256,51 +270,35 @@ const statusEl = document.getElementById('terminal-status');
 const pauseIcon = document.getElementById('pause-icon');
 
 function colorizeLog(line) {
-    // Highlight timestamp
     line = line.replace(/(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+)/g, '<span class="log-timestamp">$1</span>');
-
-    // Highlight log levels
     line = line.replace(/\| INFO \|/g, '| <span class="log-info">INFO</span> |');
     line = line.replace(/\| WARNING \|/g, '| <span class="log-warning">WARNING</span> |');
     line = line.replace(/\| ERROR \|/g, '| <span class="log-error">ERROR</span> |');
-    line = line.replace(/\| DEBUG \|/g, '| <span class="log-debug">DEBUG</span> |');
     line = line.replace(/\| SUCCESS \|/g, '| <span class="log-success">SUCCESS</span> |');
-
-    // Highlight client names in brackets
     line = line.replace(/\[([^\]]+)\]/g, '[<span class="log-client">$1</span>]');
-
-    // Highlight success messages
-    if (line.includes('sucesso') || line.includes('success') || line.includes('enviada')) {
+    if (line.includes('sucesso') || line.includes('enviada')) {
         line = `<span class="log-success">${line}</span>`;
     }
-
-    // Highlight errors
-    if (line.includes('erro') || line.includes('error') || line.includes('falha') || line.includes('failed')) {
+    if (line.includes('erro') || line.includes('error') || line.includes('falha')) {
         line = `<span class="log-error">${line}</span>`;
     }
-
     return line;
 }
 
 function appendLogs(lines) {
     if (lines.length === 0) return;
-
     const fragment = document.createDocumentFragment();
     lines.forEach(line => {
         const div = document.createElement('div');
         div.innerHTML = colorizeLog(line);
         fragment.appendChild(div);
     });
-
     terminal.appendChild(fragment);
     lineCount += lines.length;
     lineCountEl.textContent = lineCount;
-
-    // Limita a 1000 linhas no terminal
     while (terminal.children.length > 1000) {
         terminal.removeChild(terminal.firstChild);
     }
-
     if (autoScroll) {
         terminal.scrollTop = terminal.scrollHeight;
     }
@@ -308,38 +306,27 @@ function appendLogs(lines) {
 
 async function fetchLogs() {
     if (isPaused) return;
-
     try {
         const response = await fetch(`/api/server/logs/stream?session=${sessionId}&lines=100`);
         const data = await response.json();
-
-        if (data.error) {
-            console.error('Erro ao buscar logs:', data.error);
-            return;
-        }
-
+        if (data.error) return;
         if (data.lines && data.lines.length > 0) {
             appendLogs(data.lines);
         }
-
         statusEl.innerHTML = '<i class="bi bi-circle-fill"></i> Live';
         statusEl.className = 'badge bg-success';
-
     } catch (error) {
-        console.error('Erro ao buscar logs:', error);
         statusEl.innerHTML = '<i class="bi bi-exclamation-circle"></i> Erro';
         statusEl.className = 'badge bg-danger';
     }
 }
 
-// Clear button
 document.getElementById('btn-clear').addEventListener('click', () => {
     terminal.innerHTML = '';
     lineCount = 0;
     lineCountEl.textContent = '0';
 });
 
-// Pause button
 document.getElementById('btn-pause').addEventListener('click', () => {
     isPaused = !isPaused;
     if (isPaused) {
@@ -348,13 +335,10 @@ document.getElementById('btn-pause').addEventListener('click', () => {
         statusEl.className = 'badge bg-warning';
     } else {
         pauseIcon.className = 'bi bi-pause-fill';
-        statusEl.innerHTML = '<i class="bi bi-circle-fill"></i> Live';
-        statusEl.className = 'badge bg-success';
         fetchLogs();
     }
 });
 
-// Auto-scroll button
 document.getElementById('btn-scroll').addEventListener('click', () => {
     autoScroll = !autoScroll;
     const btn = document.getElementById('btn-scroll');
@@ -368,7 +352,6 @@ document.getElementById('btn-scroll').addEventListener('click', () => {
     }
 });
 
-// Detect manual scroll
 terminal.addEventListener('scroll', () => {
     const isAtBottom = terminal.scrollHeight - terminal.scrollTop <= terminal.clientHeight + 50;
     if (!isAtBottom && autoScroll) {
@@ -378,7 +361,6 @@ terminal.addEventListener('scroll', () => {
     }
 });
 
-// Initialize
 document.addEventListener('DOMContentLoaded', () => {
     fetchLogs();
     setInterval(fetchLogs, REFRESH_INTERVAL);

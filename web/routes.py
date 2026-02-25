@@ -271,6 +271,9 @@ def logs():
     per_page = 50
     selected_client = request.args.get("client_id", "", type=int) or None
     selected_status = request.args.get("status", "")
+    search_query = request.args.get("q", "").strip()
+    date_from = request.args.get("date_from", "")
+    date_to = request.args.get("date_to", "")
 
     query = TaskLog.query.order_by(TaskLog.created_at.desc())
 
@@ -278,6 +281,20 @@ def logs():
         query = query.filter_by(client_id=selected_client)
     if selected_status:
         query = query.filter_by(status=selected_status)
+    if search_query:
+        query = query.filter(TaskLog.task_name.ilike(f"%{search_query}%"))
+    if date_from:
+        try:
+            dt_from = datetime.strptime(date_from, "%Y-%m-%d")
+            query = query.filter(TaskLog.created_at >= dt_from)
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            dt_to = datetime.strptime(date_to, "%Y-%m-%d") + timedelta(days=1)
+            query = query.filter(TaskLog.created_at < dt_to)
+        except ValueError:
+            pass
 
     total = query.count()
     total_pages = max(1, (total + per_page - 1) // per_page)
@@ -291,8 +308,69 @@ def logs():
         all_clients=all_clients,
         selected_client=selected_client,
         selected_status=selected_status,
+        search_query=search_query,
+        date_from=date_from,
+        date_to=date_to,
         page=page,
         total_pages=total_pages,
+        total=total,
+    )
+
+
+@main_bp.route("/logs/export")
+@login_required
+def logs_export():
+    """Exporta logs em CSV."""
+    import csv
+    import io
+    from flask import Response
+
+    selected_client = request.args.get("client_id", "", type=int) or None
+    selected_status = request.args.get("status", "")
+    date_from = request.args.get("date_from", "")
+    date_to = request.args.get("date_to", "")
+
+    query = TaskLog.query.order_by(TaskLog.created_at.desc())
+
+    if selected_client:
+        query = query.filter_by(client_id=selected_client)
+    if selected_status:
+        query = query.filter_by(status=selected_status)
+    if date_from:
+        try:
+            dt_from = datetime.strptime(date_from, "%Y-%m-%d")
+            query = query.filter(TaskLog.created_at >= dt_from)
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            dt_to = datetime.strptime(date_to, "%Y-%m-%d") + timedelta(days=1)
+            query = query.filter(TaskLog.created_at < dt_to)
+        except ValueError:
+            pass
+
+    logs_list = query.limit(5000).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Data", "Cliente", "Tarefa", "Disciplina", "Formato", "Status", "Erro"])
+
+    for log in logs_list:
+        writer.writerow([
+            log.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            log.client.nome,
+            log.task_name,
+            log.discipline or "",
+            log.format or "",
+            log.status,
+            log.error_msg or ""
+        ])
+
+    output.seek(0)
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment;filename=logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"}
     )
 
 

@@ -17,65 +17,92 @@
     </div>
 </div>
 
-<!-- Stats Cards -->
-<div class="row g-3 mb-4">
-    <div class="col-6 col-lg-3">
+<!-- Error Alert Banner -->
+<div id="error-alert" class="alert alert-danger border-0 shadow-sm mb-4 d-none">
+    <div class="d-flex align-items-center">
+        <i class="bi bi-exclamation-triangle-fill fs-4 me-3"></i>
+        <div class="flex-grow-1">
+            <strong><span id="error-count">0</span> erro(s)</strong> nas ultimas 24 horas
+            <a href="{{ url_for('main.logs') }}?status=error" class="alert-link ms-2">Ver detalhes</a>
+        </div>
+    </div>
+</div>
+
+<!-- Stats Cards Row 1 -->
+<div class="row g-3 mb-3">
+    <div class="col-6 col-md-4 col-lg-2">
         <div class="card stat-card h-100">
-            <div class="card-body">
-                <div class="d-flex align-items-center">
-                    <div class="icon-box bg-primary-subtle text-primary me-3">
-                        <i class="bi bi-people-fill"></i>
-                    </div>
-                    <div>
-                        <div class="fs-3 fw-bold" id="stat-total">{{ stats.total_clients }}</div>
-                        <small class="text-muted">Total Clientes</small>
-                    </div>
-                </div>
+            <div class="card-body text-center py-3">
+                <div class="fs-2 fw-bold text-primary" id="stat-total">{{ stats.total_clients }}</div>
+                <small class="text-muted">Clientes</small>
             </div>
         </div>
     </div>
-    <div class="col-6 col-lg-3">
+    <div class="col-6 col-md-4 col-lg-2">
         <div class="card stat-card h-100">
-            <div class="card-body">
-                <div class="d-flex align-items-center">
-                    <div class="icon-box bg-success-subtle text-success me-3">
-                        <i class="bi bi-check-circle-fill"></i>
-                    </div>
-                    <div>
-                        <div class="fs-3 fw-bold" id="stat-active">{{ stats.active_clients }}</div>
-                        <small class="text-muted">Ativos</small>
-                    </div>
-                </div>
+            <div class="card-body text-center py-3">
+                <div class="fs-2 fw-bold text-success" id="stat-active">{{ stats.active_clients }}</div>
+                <small class="text-muted">Ativos</small>
             </div>
         </div>
     </div>
-    <div class="col-6 col-lg-3">
+    <div class="col-6 col-md-4 col-lg-2">
         <div class="card stat-card h-100">
-            <div class="card-body">
-                <div class="d-flex align-items-center">
-                    <div class="icon-box bg-danger-subtle text-danger me-3">
-                        <i class="bi bi-x-circle-fill"></i>
-                    </div>
-                    <div>
-                        <div class="fs-3 fw-bold" id="stat-expired">{{ stats.expired_clients }}</div>
-                        <small class="text-muted">Expirados</small>
-                    </div>
-                </div>
+            <div class="card-body text-center py-3">
+                <div class="fs-2 fw-bold text-info" id="stat-tasks-today">{{ stats.tasks_today }}</div>
+                <small class="text-muted">Hoje</small>
             </div>
         </div>
     </div>
-    <div class="col-6 col-lg-3">
+    <div class="col-6 col-md-4 col-lg-2">
         <div class="card stat-card h-100">
-            <div class="card-body">
-                <div class="d-flex align-items-center">
-                    <div class="icon-box bg-info-subtle text-info me-3">
-                        <i class="bi bi-journal-check"></i>
-                    </div>
-                    <div>
-                        <div class="fs-3 fw-bold" id="stat-tasks">{{ stats.tasks_today }}</div>
-                        <small class="text-muted">Tarefas Hoje</small>
-                    </div>
-                </div>
+            <div class="card-body text-center py-3">
+                <div class="fs-2 fw-bold text-secondary" id="stat-tasks-week">-</div>
+                <small class="text-muted">Semana</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card stat-card h-100">
+            <div class="card-body text-center py-3">
+                <div class="fs-2 fw-bold text-warning" id="stat-success-rate">-</div>
+                <small class="text-muted">Taxa Sucesso</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="card stat-card h-100">
+            <div class="card-body text-center py-3">
+                <div class="fs-2 fw-bold" id="stat-avg-day">-</div>
+                <small class="text-muted">Media/Dia</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- System Status Bar -->
+<div class="card mb-4">
+    <div class="card-body py-2">
+        <div class="row align-items-center text-center">
+            <div class="col-auto">
+                <small class="text-muted">Sistema:</small>
+            </div>
+            <div class="col-auto">
+                <span class="badge bg-success" id="scheduler-status">
+                    <i class="bi bi-play-circle"></i> Scheduler OK
+                </span>
+            </div>
+            <div class="col-auto">
+                <small class="text-muted">Uptime: <strong id="sys-uptime">-</strong></small>
+            </div>
+            <div class="col-auto">
+                <small class="text-muted">CPU: <strong id="sys-cpu">-</strong></small>
+            </div>
+            <div class="col-auto">
+                <small class="text-muted">RAM: <strong id="sys-memory">-</strong></small>
+            </div>
+            <div class="col-auto">
+                <small class="text-muted">Jobs: <strong id="sys-jobs">-</strong></small>
             </div>
         </div>
     </div>
@@ -84,9 +111,7 @@
 <!-- Alerts -->
 {% if expiring_clients %}
 <div class="alert alert-warning border-0 shadow-sm d-flex align-items-center mb-4">
-    <div class="alert-icon me-3">
-        <i class="bi bi-exclamation-triangle-fill fs-4"></i>
-    </div>
+    <i class="bi bi-exclamation-triangle-fill fs-4 me-3"></i>
     <div>
         <strong>{{ expiring_clients|length }} cliente(s)</strong> com assinatura vencendo em 7 dias:
         {% for c in expiring_clients %}
@@ -96,130 +121,124 @@
 </div>
 {% endif %}
 
-<!-- Client Status Monitor -->
-<div class="card mb-4">
-    <div class="card-header bg-white py-3">
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <h6 class="fw-bold m-0"><i class="bi bi-activity text-primary"></i> Status em Tempo Real</h6>
-                <small class="text-muted">Monitoramento de todos os clientes</small>
+<!-- Activity Chart + Client Status -->
+<div class="row g-4 mb-4">
+    <!-- Activity Chart -->
+    <div class="col-lg-5">
+        <div class="card h-100">
+            <div class="card-header bg-white py-3">
+                <h6 class="fw-bold m-0"><i class="bi bi-bar-chart text-primary"></i> Atividade - Ultimos 7 Dias</h6>
+            </div>
+            <div class="card-body">
+                <div id="activity-chart" style="height: 200px;">
+                    <div class="d-flex justify-content-between align-items-end h-100" id="chart-bars">
+                        <!-- Chart bars will be inserted here -->
+                    </div>
+                </div>
+                <div class="d-flex justify-content-center gap-4 mt-3">
+                    <small><span class="badge badge-success me-1">&nbsp;</span> Enviados</small>
+                    <small><span class="badge badge-error me-1">&nbsp;</span> Erros</small>
+                    <small><span class="badge badge-secondary me-1">&nbsp;</span> Outros</small>
+                </div>
             </div>
         </div>
     </div>
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead>
-                    <tr class="bg-light">
-                        <th class="ps-4">Cliente</th>
-                        <th>Assinatura</th>
-                        <th>Status</th>
-                        <th>Acao Atual</th>
-                        <th>Ultima Verificacao</th>
-                        <th class="text-center">Tarefas</th>
-                    </tr>
-                </thead>
-                <tbody id="clients-status-body">
-                    <tr>
-                        <td colspan="6" class="text-center py-5">
-                            <div class="spinner-border spinner-border-sm text-primary me-2"></div>
-                            Carregando clientes...
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+
+    <!-- Client Status Monitor -->
+    <div class="col-lg-7">
+        <div class="card h-100">
+            <div class="card-header bg-white py-3">
+                <h6 class="fw-bold m-0"><i class="bi bi-activity text-primary"></i> Status dos Clientes</h6>
+            </div>
+            <div class="card-body p-0" style="max-height: 280px; overflow-y: auto;">
+                <table class="table table-hover align-middle mb-0 table-sm">
+                    <thead class="sticky-top bg-light">
+                        <tr>
+                            <th class="ps-3">Cliente</th>
+                            <th>Status</th>
+                            <th>Acao</th>
+                            <th class="text-center">Sucesso</th>
+                            <th>Proximo</th>
+                        </tr>
+                    </thead>
+                    <tbody id="clients-status-body">
+                        <tr>
+                            <td colspan="5" class="text-center py-4">
+                                <div class="spinner-border spinner-border-sm text-primary"></div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </div>
 
-<!-- Recent Tasks & Clients -->
+<!-- Recent Tasks & Recent Errors -->
 <div class="row g-4">
     <div class="col-lg-8">
         <div class="card h-100">
             <div class="card-header bg-white py-3">
                 <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="fw-bold m-0"><i class="bi bi-clock-history text-primary"></i> Ultimas Tarefas</h6>
-                        <small class="text-muted">Atividades processadas recentemente</small>
-                    </div>
+                    <h6 class="fw-bold m-0"><i class="bi bi-clock-history text-primary"></i> Ultimas Tarefas</h6>
                     <a href="{{ url_for('main.logs') }}" class="btn btn-sm btn-outline-primary">
                         <i class="bi bi-list"></i> Ver todas
                     </a>
                 </div>
             </div>
             <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead>
-                            <tr class="bg-light">
-                                <th class="ps-4">Cliente</th>
-                                <th>Tarefa</th>
-                                <th>Formato</th>
-                                <th>Status</th>
-                                <th>Quando</th>
-                            </tr>
-                        </thead>
-                        <tbody id="recent-tasks-body">
-                            {% for log in recent_tasks %}
-                            <tr>
-                                <td class="ps-4">
-                                    <span class="fw-medium">{{ log.client.nome }}</span>
-                                </td>
-                                <td>
-                                    <div class="text-truncate" style="max-width: 250px;" title="{{ log.task_name }}">
-                                        {{ log.task_name }}
-                                    </div>
-                                    {% if log.discipline %}
-                                    <small class="text-muted">{{ log.discipline[:30] }}</small>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if log.format %}
-                                        {% if log.format == 'docx' %}
-                                            <span class="badge bg-primary-subtle text-primary"><i class="bi bi-file-earmark-word"></i> DOCX</span>
-                                        {% elif log.format == 'pdf' %}
-                                            <span class="badge bg-danger-subtle text-danger"><i class="bi bi-file-earmark-pdf"></i> PDF</span>
-                                        {% elif log.format == 'texto' %}
-                                            <span class="badge bg-secondary-subtle text-secondary"><i class="bi bi-file-earmark-text"></i> Texto</span>
-                                        {% elif log.format in ['py', 'js', 'html', 'css', 'java', 'cpp', 'c'] %}
-                                            <span class="badge bg-success-subtle text-success"><i class="bi bi-file-earmark-code"></i> {{ log.format|upper }}</span>
-                                        {% elif log.format == 'zip' %}
-                                            <span class="badge bg-warning-subtle text-warning"><i class="bi bi-file-earmark-zip"></i> ZIP</span>
-                                        {% else %}
-                                            <span class="badge bg-light text-dark border">{{ log.format|upper }}</span>
-                                        {% endif %}
+                <table class="table table-hover align-middle mb-0 table-sm">
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="ps-3">Cliente</th>
+                            <th>Tarefa</th>
+                            <th>Formato</th>
+                            <th>Status</th>
+                            <th>Quando</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recent-tasks-body">
+                        {% for log in recent_tasks %}
+                        <tr>
+                            <td class="ps-3"><small class="fw-medium">{{ log.client.nome }}</small></td>
+                            <td>
+                                <small class="text-truncate d-inline-block" style="max-width: 200px;">{{ log.task_name }}</small>
+                            </td>
+                            <td>
+                                {% if log.format %}
+                                    {% if log.format == 'docx' %}
+                                        <span class="badge bg-primary-subtle text-primary"><i class="bi bi-file-word"></i></span>
+                                    {% elif log.format == 'pdf' %}
+                                        <span class="badge bg-danger-subtle text-danger"><i class="bi bi-file-pdf"></i></span>
+                                    {% elif log.format == 'texto' %}
+                                        <span class="badge bg-secondary-subtle text-secondary"><i class="bi bi-file-text"></i></span>
                                     {% else %}
-                                        <span class="text-muted">-</span>
+                                        <span class="badge bg-light text-dark border">{{ log.format }}</span>
                                     {% endif %}
-                                </td>
-                                <td>
-                                    {% if log.status == 'success' %}
-                                        <span class="badge badge-success"><i class="bi bi-check-lg"></i> Enviado</span>
-                                    {% elif log.status == 'not_found' %}
-                                        <span class="badge badge-secondary"><i class="bi bi-search"></i> Nao encontrado</span>
-                                    {% elif log.status == 'group' %}
-                                        <span class="badge badge-group"><i class="bi bi-people"></i> Grupo</span>
-                                    {% elif log.status == 'skipped' %}
-                                        <span class="badge badge-skipped"><i class="bi bi-skip-forward"></i> Pulado</span>
-                                    {% else %}
-                                        <span class="badge badge-error"><i class="bi bi-x-lg"></i> Erro</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <small class="text-muted">{{ log.created_at.strftime('%d/%m %H:%M') }}</small>
-                                </td>
-                            </tr>
-                            {% else %}
-                            <tr>
-                                <td colspan="5" class="text-center py-5 text-muted">
-                                    <i class="bi bi-inbox fs-1 d-block mb-2 opacity-50"></i>
-                                    Nenhuma tarefa processada ainda
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+                                {% else %}
+                                    <small class="text-muted">-</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if log.status == 'success' %}
+                                    <span class="badge badge-success"><i class="bi bi-check"></i></span>
+                                {% elif log.status == 'not_found' %}
+                                    <span class="badge badge-secondary"><i class="bi bi-search"></i></span>
+                                {% elif log.status == 'group' %}
+                                    <span class="badge badge-group"><i class="bi bi-people"></i></span>
+                                {% elif log.status == 'skipped' %}
+                                    <span class="badge badge-skipped"><i class="bi bi-skip-forward"></i></span>
+                                {% else %}
+                                    <span class="badge badge-error"><i class="bi bi-x"></i></span>
+                                {% endif %}
+                            </td>
+                            <td><small class="text-muted">{{ log.created_at.strftime('%d/%m %H:%M') }}</small></td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="5" class="text-center py-4 text-muted">Nenhuma tarefa</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -227,45 +246,13 @@
     <div class="col-lg-4">
         <div class="card h-100">
             <div class="card-header bg-white py-3">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="fw-bold m-0"><i class="bi bi-person-plus text-primary"></i> Clientes Recentes</h6>
-                        <small class="text-muted">Ultimos cadastros</small>
-                    </div>
-                    <a href="{{ url_for('main.client_add') }}" class="btn btn-sm btn-primary">
-                        <i class="bi bi-plus-lg"></i>
-                    </a>
-                </div>
+                <h6 class="fw-bold m-0"><i class="bi bi-exclamation-circle text-danger"></i> Erros Recentes</h6>
             </div>
-            <div class="card-body p-0">
-                <div class="list-group list-group-flush">
-                    {% for client in recent_clients %}
-                    <a href="{{ url_for('main.client_detail', client_id=client.id) }}" class="list-group-item list-group-item-action py-3">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <div class="fw-semibold">{{ client.nome }}</div>
-                                <small class="text-muted">{{ client.teams_email[:25] }}...</small>
-                            </div>
-                            <div class="text-end">
-                                {% if client.is_active %}
-                                    <span class="badge badge-success">Ativo</span>
-                                {% elif client.status == 'paused' %}
-                                    <span class="badge badge-warning">Pausado</span>
-                                {% else %}
-                                    <span class="badge badge-error">Expirado</span>
-                                {% endif %}
-                                <div class="mt-1">
-                                    <small class="text-muted"><i class="bi bi-check2-all"></i> {{ client.tasks_completed }}</small>
-                                </div>
-                            </div>
-                        </div>
-                    </a>
-                    {% else %}
-                    <div class="text-center py-5 text-muted">
-                        <i class="bi bi-person-plus fs-1 d-block mb-2 opacity-50"></i>
-                        Nenhum cliente cadastrado
+            <div class="card-body p-0" style="max-height: 300px; overflow-y: auto;">
+                <div class="list-group list-group-flush" id="recent-errors">
+                    <div class="text-center py-4 text-muted">
+                        <div class="spinner-border spinner-border-sm"></div>
                     </div>
-                    {% endfor %}
                 </div>
             </div>
         </div>
@@ -275,174 +262,49 @@
 
 {% block scripts %}
 <style>
-.icon-box {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.25rem;
-}
-.spin-slow {
-    animation: spin 2s linear infinite;
-}
-@keyframes spin {
-    100% { transform: rotate(360deg); }
-}
-.status-running {
-    background: linear-gradient(90deg, #dbeafe 0%, #eff6ff 100%);
-    border-left: 3px solid #3b82f6;
-}
-.status-error {
-    background: linear-gradient(90deg, #fee2e2 0%, #fef2f2 100%);
-    border-left: 3px solid #ef4444;
-}
-.pulse {
-    animation: pulse 2s ease-in-out infinite;
-}
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.6; }
-}
-.table th {
-    font-weight: 600;
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: #6b7280;
-    border-bottom: none;
-}
-.table td {
-    vertical-align: middle;
-    border-color: #f3f4f6;
-}
-.card {
-    border: 1px solid #e5e7eb;
-}
-.card-header {
-    border-bottom: 1px solid #f3f4f6;
-}
+.spin-slow { animation: spin 2s linear infinite; }
+@keyframes spin { 100% { transform: rotate(360deg); } }
+.status-running { background: linear-gradient(90deg, #dbeafe 0%, #eff6ff 100%); }
+.status-error { background: linear-gradient(90deg, #fee2e2 0%, #fef2f2 100%); }
+.pulse { animation: pulse 2s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+.table th { font-weight: 600; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7280; }
+.table-sm td, .table-sm th { padding: 0.4rem 0.5rem; }
+.chart-bar { min-width: 30px; margin: 0 2px; border-radius: 4px 4px 0 0; transition: all 0.3s; }
+.chart-bar:hover { opacity: 0.8; }
+.chart-bar-success { background: #10b981; }
+.chart-bar-error { background: #ef4444; }
+.chart-bar-other { background: #6b7280; }
 .bg-primary-subtle { background-color: #eff6ff; }
-.bg-success-subtle { background-color: #f0fdf4; }
 .bg-danger-subtle { background-color: #fef2f2; }
-.bg-warning-subtle { background-color: #fffbeb; }
-.bg-info-subtle { background-color: #f0f9ff; }
 .bg-secondary-subtle { background-color: #f9fafb; }
-.text-primary { color: #3b82f6 !important; }
-.text-success { color: #22c55e !important; }
-.text-danger { color: #ef4444 !important; }
-.text-warning { color: #f59e0b !important; }
-.text-info { color: #0ea5e9 !important; }
 </style>
 
 <script>
 const REFRESH_INTERVAL = 10000;
-let lastLogTimestamp = null;
 
 function formatDate(isoString) {
     if (!isoString) return '-';
     const date = new Date(isoString);
-    return date.toLocaleString('pt-BR', {
-        day: '2-digit',
-        month: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
+    return date.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 
-function getSubscriptionBadge(status) {
+function getStatusBadge(status) {
     const badges = {
         'active': '<span class="badge badge-success">Ativo</span>',
         'paused': '<span class="badge badge-warning">Pausado</span>',
         'expired': '<span class="badge badge-error">Expirado</span>',
     };
-    return badges[status] || '<span class="badge badge-secondary">-</span>';
+    return badges[status] || '-';
 }
 
 function getRuntimeBadge(status) {
     const badges = {
-        'idle': '<span class="badge badge-secondary"><i class="bi bi-pause-circle"></i> Aguardando</span>',
-        'running': '<span class="badge bg-primary pulse"><i class="bi bi-play-circle-fill"></i> Executando</span>',
-        'error': '<span class="badge badge-error"><i class="bi bi-exclamation-triangle"></i> Erro</span>',
+        'idle': '<span class="badge badge-secondary">Idle</span>',
+        'running': '<span class="badge bg-primary pulse">Executando</span>',
+        'error': '<span class="badge badge-error">Erro</span>',
     };
-    return badges[status] || '<span class="badge badge-secondary">-</span>';
-}
-
-function getTaskStatusBadge(status) {
-    const badges = {
-        'success': '<span class="badge badge-success"><i class="bi bi-check-lg"></i> Enviado</span>',
-        'not_found': '<span class="badge badge-secondary"><i class="bi bi-search"></i> Nao encontrado</span>',
-        'group': '<span class="badge badge-group"><i class="bi bi-people"></i> Grupo</span>',
-        'skipped': '<span class="badge badge-skipped"><i class="bi bi-skip-forward"></i> Pulado</span>',
-        'error': '<span class="badge badge-error"><i class="bi bi-x-lg"></i> Erro</span>',
-    };
-    return badges[status] || '<span class="badge badge-secondary">-</span>';
-}
-
-function getFormatBadge(format) {
-    if (!format) return '<span class="text-muted">-</span>';
-
-    const formats = {
-        'docx': '<span class="badge bg-primary-subtle text-primary"><i class="bi bi-file-earmark-word"></i> DOCX</span>',
-        'pdf': '<span class="badge bg-danger-subtle text-danger"><i class="bi bi-file-earmark-pdf"></i> PDF</span>',
-        'texto': '<span class="badge bg-secondary-subtle text-secondary"><i class="bi bi-file-earmark-text"></i> Texto</span>',
-        'py': '<span class="badge bg-success-subtle text-success"><i class="bi bi-file-earmark-code"></i> PY</span>',
-        'js': '<span class="badge bg-success-subtle text-success"><i class="bi bi-file-earmark-code"></i> JS</span>',
-        'html': '<span class="badge bg-success-subtle text-success"><i class="bi bi-file-earmark-code"></i> HTML</span>',
-        'zip': '<span class="badge bg-warning-subtle text-warning"><i class="bi bi-file-earmark-zip"></i> ZIP</span>',
-    };
-    return formats[format.toLowerCase()] || `<span class="badge bg-light text-dark border">${format.toUpperCase()}</span>`;
-}
-
-async function updateClientsStatus() {
-    try {
-        const response = await fetch('/api/clients/status');
-        const clients = await response.json();
-
-        const tbody = document.getElementById('clients-status-body');
-        if (clients.length === 0) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="6" class="text-center py-5 text-muted">
-                        <i class="bi bi-person-plus fs-1 d-block mb-2 opacity-50"></i>
-                        Nenhum cliente cadastrado
-                    </td>
-                </tr>`;
-            return;
-        }
-
-        tbody.innerHTML = clients.map(client => {
-            const rowClass = client.current_status === 'running' ? 'status-running' :
-                           client.current_status === 'error' ? 'status-error' : '';
-
-            return `
-                <tr class="${rowClass}">
-                    <td class="ps-4">
-                        <a href="/clients/${client.id}" class="fw-semibold text-decoration-none text-dark">
-                            ${client.nome}
-                        </a>
-                        ${client.days_remaining <= 7 && client.days_remaining > 0 ?
-                            `<span class="badge bg-warning-subtle text-warning ms-2"><i class="bi bi-clock"></i> ${client.days_remaining}d</span>` : ''}
-                    </td>
-                    <td>${getSubscriptionBadge(client.subscription_status)}</td>
-                    <td>${getRuntimeBadge(client.current_status)}</td>
-                    <td>
-                        <div class="text-truncate" style="max-width: 200px;">
-                            ${client.current_action || '<span class="text-muted">-</span>'}
-                        </div>
-                    </td>
-                    <td><small class="text-muted">${formatDate(client.last_check)}</small></td>
-                    <td class="text-center">
-                        <span class="badge bg-info-subtle text-info fs-6">${client.tasks_completed}</span>
-                    </td>
-                </tr>
-            `;
-        }).join('');
-
-    } catch (error) {
-        console.error('Erro ao atualizar status:', error);
-    }
+    return badges[status] || '-';
 }
 
 async function updateStats() {
@@ -452,61 +314,135 @@ async function updateStats() {
 
         document.getElementById('stat-total').textContent = stats.total_clients;
         document.getElementById('stat-active').textContent = stats.active_clients;
-        document.getElementById('stat-expired').textContent = stats.expired_clients;
-        document.getElementById('stat-tasks').textContent = stats.tasks_today;
+        document.getElementById('stat-tasks-today').textContent = stats.tasks_today;
+        document.getElementById('stat-tasks-week').textContent = stats.tasks_week;
+        document.getElementById('stat-success-rate').textContent = stats.success_rate + '%';
+        document.getElementById('stat-avg-day').textContent = stats.avg_per_day;
 
+        // Error alert
+        const errorAlert = document.getElementById('error-alert');
+        if (stats.errors_24h > 0) {
+            document.getElementById('error-count').textContent = stats.errors_24h;
+            errorAlert.classList.remove('d-none');
+        } else {
+            errorAlert.classList.add('d-none');
+        }
     } catch (error) {
         console.error('Erro ao atualizar stats:', error);
     }
 }
 
-async function updateRecentLogs() {
+async function updateSystemStatus() {
     try {
-        let url = '/api/logs/recent?limit=10';
-        if (lastLogTimestamp) {
-            url += `&after=${encodeURIComponent(lastLogTimestamp)}`;
+        const response = await fetch('/api/system/status');
+        const sys = await response.json();
+
+        document.getElementById('sys-uptime').textContent = sys.uptime;
+        document.getElementById('sys-cpu').textContent = sys.cpu_percent + '%';
+        document.getElementById('sys-memory').textContent = `${sys.memory_used_gb}/${sys.memory_total_gb}GB (${sys.memory_percent}%)`;
+        document.getElementById('sys-jobs').textContent = sys.scheduler_jobs;
+
+        const schedulerStatus = document.getElementById('scheduler-status');
+        if (sys.scheduler_running) {
+            schedulerStatus.className = 'badge bg-success';
+            schedulerStatus.innerHTML = '<i class="bi bi-play-circle"></i> Scheduler OK';
+        } else {
+            schedulerStatus.className = 'badge bg-danger';
+            schedulerStatus.innerHTML = '<i class="bi bi-stop-circle"></i> Scheduler Parado';
         }
-
-        const response = await fetch(url);
-        const logs = await response.json();
-
-        if (logs.length > 0 && lastLogTimestamp) {
-            lastLogTimestamp = logs[0].created_at;
-
-            const tbody = document.getElementById('recent-tasks-body');
-
-            const newRows = logs.map(log => `
-                <tr style="animation: fadeIn 0.5s; background-color: #f0fdf4;">
-                    <td class="ps-4"><span class="fw-medium">${log.client_name}</span></td>
-                    <td>
-                        <div class="text-truncate" style="max-width: 250px;" title="${log.task_name}">
-                            ${log.task_name}
-                        </div>
-                        ${log.discipline ? `<small class="text-muted">${log.discipline.substring(0, 30)}</small>` : ''}
-                    </td>
-                    <td>${getFormatBadge(log.format)}</td>
-                    <td>${getTaskStatusBadge(log.status)}</td>
-                    <td><small class="text-muted">${formatDate(log.created_at)}</small></td>
-                </tr>
-            `).join('');
-
-            if (newRows) {
-                const firstRow = tbody.querySelector('tr');
-                if (firstRow && firstRow.textContent.includes('Nenhuma tarefa')) {
-                    tbody.innerHTML = newRows;
-                } else {
-                    tbody.insertAdjacentHTML('afterbegin', newRows);
-                    while (tbody.children.length > 10) {
-                        tbody.removeChild(tbody.lastChild);
-                    }
-                }
-            }
-        } else if (logs.length > 0 && !lastLogTimestamp) {
-            lastLogTimestamp = logs[0].created_at;
-        }
-
     } catch (error) {
-        console.error('Erro ao atualizar logs:', error);
+        console.error('Erro ao atualizar sistema:', error);
+    }
+}
+
+async function updateActivityChart() {
+    try {
+        const response = await fetch('/api/activity/daily');
+        const days = await response.json();
+
+        const maxTotal = Math.max(...days.map(d => d.total), 1);
+        const chartContainer = document.getElementById('chart-bars');
+
+        chartContainer.innerHTML = days.map(day => {
+            const successHeight = (day.success / maxTotal) * 180;
+            const errorHeight = (day.errors / maxTotal) * 180;
+            const otherHeight = (day.other / maxTotal) * 180;
+
+            return `
+                <div class="text-center flex-fill">
+                    <div class="d-flex flex-column justify-content-end" style="height: 180px;">
+                        <div class="chart-bar chart-bar-other" style="height: ${otherHeight}px;" title="${day.other} outros"></div>
+                        <div class="chart-bar chart-bar-error" style="height: ${errorHeight}px;" title="${day.errors} erros"></div>
+                        <div class="chart-bar chart-bar-success" style="height: ${successHeight}px;" title="${day.success} enviados"></div>
+                    </div>
+                    <small class="text-muted d-block mt-1">${day.date}</small>
+                    <small class="text-muted" style="font-size: 0.65rem;">${day.weekday}</small>
+                </div>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('Erro ao atualizar grafico:', error);
+    }
+}
+
+async function updateClientsStatus() {
+    try {
+        const response = await fetch('/api/clients/status');
+        const clients = await response.json();
+
+        const tbody = document.getElementById('clients-status-body');
+        if (clients.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">Nenhum cliente</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = clients.map(client => {
+            const rowClass = client.current_status === 'running' ? 'status-running' :
+                           client.current_status === 'error' ? 'status-error' : '';
+
+            return `
+                <tr class="${rowClass}">
+                    <td class="ps-3">
+                        <a href="/clients/${client.id}" class="fw-medium text-decoration-none text-dark">${client.nome}</a>
+                    </td>
+                    <td>${getRuntimeBadge(client.current_status)}</td>
+                    <td><small class="text-truncate d-inline-block" style="max-width: 120px;">${client.current_action || '-'}</small></td>
+                    <td class="text-center">
+                        <span class="badge ${client.success_rate >= 80 ? 'badge-success' : client.success_rate >= 50 ? 'badge-warning' : 'badge-error'}">${client.success_rate}%</span>
+                    </td>
+                    <td><small class="text-muted">${client.next_check || '-'}</small></td>
+                </tr>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('Erro ao atualizar clientes:', error);
+    }
+}
+
+async function updateRecentErrors() {
+    try {
+        const response = await fetch('/api/errors/recent?limit=5');
+        const errors = await response.json();
+
+        const container = document.getElementById('recent-errors');
+
+        if (errors.length === 0) {
+            container.innerHTML = '<div class="text-center py-4 text-muted"><i class="bi bi-check-circle fs-3 d-block mb-2"></i>Nenhum erro recente</div>';
+            return;
+        }
+
+        container.innerHTML = errors.map(err => `
+            <div class="list-group-item py-2 px-3">
+                <div class="d-flex justify-content-between">
+                    <small class="fw-medium">${err.client_name}</small>
+                    <small class="text-muted">${formatDate(err.created_at)}</small>
+                </div>
+                <small class="text-truncate d-block text-muted">${err.task_name}</small>
+                <small class="text-danger text-truncate d-block">${err.error_msg || 'Erro desconhecido'}</small>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('Erro ao atualizar erros:', error);
     }
 }
 
@@ -517,9 +453,11 @@ function updateTimestamp() {
 
 async function refreshAll() {
     await Promise.all([
-        updateClientsStatus(),
         updateStats(),
-        updateRecentLogs()
+        updateSystemStatus(),
+        updateActivityChart(),
+        updateClientsStatus(),
+        updateRecentErrors()
     ]);
     updateTimestamp();
 }
@@ -529,11 +467,4 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(refreshAll, REFRESH_INTERVAL);
 });
 </script>
-
-<style>
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-</style>
 {% endblock %}
