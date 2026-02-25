@@ -79,8 +79,12 @@ def salvar_processadas(processadas: set, path: Path):
         json.dump(list(processadas), f)
 
 
-async def verificar_activity(browser, data_dir: Path, client_name: str = "") -> list:
-    """Verifica a aba Activity e retorna novas atividades."""
+async def verificar_activity(browser, data_dir: Path, client_name: str = "", max_tentativas: int = 3) -> list:
+    """Verifica a aba Activity e retorna novas atividades.
+
+    Se não encontrar atividades, tenta novamente até max_tentativas vezes,
+    esperando 10 segundos entre cada tentativa.
+    """
     log("Acessando Activity...", client_name)
 
     try:
@@ -93,53 +97,67 @@ async def verificar_activity(browser, data_dir: Path, client_name: str = "") -> 
         except Exception:
             activity_btn = browser.page.locator('[aria-label*="Activity"], [aria-label*="Atividade"]').first
             await activity_btn.click(timeout=5000)
-    await asyncio.sleep(4)
 
-    await browser.page.screenshot(path=str(data_dir / "activity_atual.png"))
-    content = await browser.page.inner_text("body")
+    for tentativa in range(1, max_tentativas + 1):
+        # Espera inicial maior na primeira tentativa, 10s nas seguintes
+        tempo_espera = 6 if tentativa == 1 else 10
+        await asyncio.sleep(tempo_espera)
 
-    with open(data_dir / "activity_content.txt", "w", encoding="utf-8") as f:
-        f.write(content)
+        await browser.page.screenshot(path=str(data_dir / "activity_atual.png"))
+        content = await browser.page.inner_text("body")
 
-    atividades = []
-    lines = content.split("\n")
-    i = 0
-    while i < len(lines):
-        line = lines[i].strip()
+        with open(data_dir / "activity_content.txt", "w", encoding="utf-8") as f:
+            f.write(content)
 
-        if "adicionou uma tarefa" in line or "atualizou uma tarefa" in line:
-            atividade = {
-                "tipo": "assignment",
-                "professor": line.split(" adicion")[0].split(" atualiz")[0].strip(),
-                "acao": "nova" if "adicionou" in line else "atualizada"
-            }
+        atividades = []
+        lines = content.split("\n")
+        i = 0
+        while i < len(lines):
+            line = lines[i].strip()
 
-            for j in range(i + 1, min(i + 5, len(lines))):
-                next_line = lines[j].strip()
-                if not next_line:
-                    continue
-                if "Conclus" in next_line:
-                    atividade["prazo"] = next_line
-                elif "|" in next_line:
-                    parts = next_line.split("|")
-                    atividade["disciplina"] = parts[0].strip()
-                    atividade["nome"] = parts[1].strip() if len(parts) > 1 else ""
-                elif re.match(r"^\d{1,2}/\d{1,2}$", next_line):
-                    atividade["data"] = next_line
+            if "adicionou uma tarefa" in line or "atualizou uma tarefa" in line:
+                atividade = {
+                    "tipo": "assignment",
+                    "professor": line.split(" adicion")[0].split(" atualiz")[0].strip(),
+                    "acao": "nova" if "adicionou" in line else "atualizada"
+                }
 
-            if atividade.get("nome"):
-                atividade["id"] = hashlib.md5(
-                    (atividade["nome"] + atividade.get("disciplina", "")).encode()
-                ).hexdigest()
-                atividades.append(atividade)
-                log(f"  Encontrada: {atividade['nome']}", client_name)
+                for j in range(i + 1, min(i + 5, len(lines))):
+                    next_line = lines[j].strip()
+                    if not next_line:
+                        continue
+                    if "Conclus" in next_line:
+                        atividade["prazo"] = next_line
+                    elif "|" in next_line:
+                        parts = next_line.split("|")
+                        atividade["disciplina"] = parts[0].strip()
+                        atividade["nome"] = parts[1].strip() if len(parts) > 1 else ""
+                    elif re.match(r"^\d{1,2}/\d{1,2}$", next_line):
+                        atividade["data"] = next_line
 
-            i += 4
+                if atividade.get("nome"):
+                    atividade["id"] = hashlib.md5(
+                        (atividade["nome"] + atividade.get("disciplina", "")).encode()
+                    ).hexdigest()
+                    atividades.append(atividade)
+                    log(f"  Encontrada: {atividade['nome']}", client_name)
+
+                i += 4
+            else:
+                i += 1
+
+        # Se encontrou atividades, retorna
+        if atividades:
+            log(f"Total: {len(atividades)} atividades encontradas", client_name)
+            return atividades
+
+        # Se não encontrou e ainda tem tentativas, tenta de novo
+        if tentativa < max_tentativas:
+            log(f"Nenhuma atividade encontrada, tentativa {tentativa}/{max_tentativas}. Aguardando 10s...", client_name)
         else:
-            i += 1
+            log(f"Total: 0 atividades encontradas (apos {max_tentativas} tentativas)", client_name)
 
-    log(f"Total: {len(atividades)} atividades encontradas", client_name)
-    return atividades
+    return []
 
 
 async def buscar_tarefa_no_frame(frame, nome_tarefa: str) -> bool:
