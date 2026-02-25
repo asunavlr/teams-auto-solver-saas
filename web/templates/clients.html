@@ -7,9 +7,16 @@
         <h4 class="fw-bold m-0">Gerenciamento de Clientes</h4>
         <small class="text-muted">{{ counts.total }} cliente(s) cadastrado(s)</small>
     </div>
-    <a href="{{ url_for('main.client_add') }}" class="btn btn-primary">
-        <i class="bi bi-plus-lg"></i> Novo Cliente
-    </a>
+    <div class="d-flex gap-2">
+        <form method="POST" action="{{ url_for('main.clients_run_all') }}" class="d-inline">
+            <button type="submit" class="btn btn-success" {% if counts.active == 0 %}disabled{% endif %}>
+                <i class="bi bi-play-fill"></i> Rodar Todos ({{ counts.active }})
+            </button>
+        </form>
+        <a href="{{ url_for('main.client_add') }}" class="btn btn-primary">
+            <i class="bi bi-plus-lg"></i> Novo Cliente
+        </a>
+    </div>
 </div>
 
 <!-- Stats Cards -->

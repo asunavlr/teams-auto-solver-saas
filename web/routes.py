@@ -279,6 +279,44 @@ def client_run_now(client_id):
     return redirect(url_for("main.client_detail", client_id=client.id))
 
 
+@main_bp.route("/clients/run-all", methods=["POST"])
+@login_required
+def clients_run_all():
+    """Executa todos os clientes ativos agora."""
+    from datetime import datetime
+
+    active_clients = Client.query.filter(
+        Client.status == "active",
+        Client.expires_at > datetime.utcnow()
+    ).all()
+
+    if not active_clients:
+        flash("Nenhum cliente ativo encontrado.", "warning")
+        return redirect(url_for("main.clients"))
+
+    count = 0
+    errors = []
+
+    try:
+        from engine.scheduler import run_client_now
+        for client in active_clients:
+            try:
+                run_client_now(client.id)
+                count += 1
+            except Exception as e:
+                errors.append(f"{client.nome}: {e}")
+    except Exception as e:
+        flash(f"Erro ao iniciar execucoes: {e}", "danger")
+        return redirect(url_for("main.clients"))
+
+    if count > 0:
+        flash(f"Execucao iniciada para {count} cliente(s)!", "success")
+    if errors:
+        flash(f"Erros: {', '.join(errors[:3])}", "warning")
+
+    return redirect(url_for("main.clients"))
+
+
 @main_bp.route("/logs")
 @login_required
 def logs():
