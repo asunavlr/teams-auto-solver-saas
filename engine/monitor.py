@@ -413,9 +413,22 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
                 # Se não encontrar seletor específico, espera tempo fixo
                 await asyncio.sleep(10)
 
+            ultimo_hash = None
             for page_num in range(1, MAX_PDF_PAGES + 1):
                 ss_path = data_dir / f"pdf_novo_{page_num}.png"
                 await browser.page.screenshot(path=str(ss_path))
+
+                # Verifica se o screenshot é igual ao anterior (fim do documento)
+                with open(ss_path, "rb") as f:
+                    current_hash = hashlib.md5(f.read()).hexdigest()
+
+                if current_hash == ultimo_hash:
+                    log(f"  Pagina {page_num} igual a anterior, fim do PDF", config.nome)
+                    # Remove o screenshot duplicado
+                    ss_path.unlink()
+                    break
+
+                ultimo_hash = current_hash
                 tarefa_info["screenshots"].append(str(ss_path))
                 log(f"  Screenshot {page_num} do PDF capturado", config.nome)
 
@@ -446,7 +459,6 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
                         await asyncio.sleep(1)
                         navegou = True
                     except Exception:
-                        # Nao conseguiu navegar, provavelmente acabou as paginas
                         break
 
                 # Se nao navegou de nenhuma forma, para o loop
