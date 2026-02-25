@@ -1,0 +1,24 @@
+# Web
+flask>=3.0
+flask-sqlalchemy>=3.1
+flask-login>=0.6
+flask-wtf>=1.2
+
+# Scheduler
+apscheduler>=3.10
+
+# Automacao
+playwright>=1.49
+anthropic>=0.18
+
+# Arquivos
+python-docx>=1.0
+openpyxl>=3.1
+python-pptx>=0.6
+
+# Seguranca
+cryptography>=42.0
+
+# Utilidades
+python-dotenv>=1.0
+loguru>=0.7

@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.env
+instance/
+data/client_*/
+logs/
+venv/
+*.spec
+dist/
+build/

@@ -1,0 +1,24 @@
+[Unit]
+Description=Teams Auto Solver SaaS
+After=network.target
+
+[Service]
+Type=simple
+User=solver
+Group=solver
+WorkingDirectory=/opt/teams-auto-solver
+ExecStart=/opt/teams-auto-solver/venv/bin/python app.py
+Restart=always
+RestartSec=10
+Environment=DISPLAY=:99
+
+# Limites
+LimitNOFILE=65535
+TimeoutStartSec=60
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

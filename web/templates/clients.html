@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Clientes - Teams Auto Solver{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="fw-bold m-0">Clientes</h4>
+    <a href="{{ url_for('main.client_add') }}" class="btn btn-primary">
+        <i class="bi bi-plus-lg"></i> Novo Cliente
+    </a>
+</div>
+
+<!-- Filtros -->
+<div class="btn-group mb-3">
+    <a href="{{ url_for('main.clients') }}" class="btn btn-sm {% if not filter %}btn-primary{% else %}btn-outline-primary{% endif %}">
+        Todos ({{ counts.total }})
+    </a>
+    <a href="{{ url_for('main.clients', filter='active') }}" class="btn btn-sm {% if filter == 'active' %}btn-success{% else %}btn-outline-success{% endif %}">
+        Ativos ({{ counts.active }})
+    </a>
+    <a href="{{ url_for('main.clients', filter='expired') }}" class="btn btn-sm {% if filter == 'expired' %}btn-danger{% else %}btn-outline-danger{% endif %}">
+        Expirados ({{ counts.expired }})
+    </a>
+    <a href="{{ url_for('main.clients', filter='paused') }}" class="btn btn-sm {% if filter == 'paused' %}btn-warning{% else %}btn-outline-warning{% endif %}">
+        Pausados ({{ counts.paused }})
+    </a>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Nome</th>
+                    <th>Email Teams</th>
+                    <th>Status</th>
+                    <th>Expira em</th>
+                    <th>Tarefas</th>
+                    <th>Ultimo Check</th>
+                    <th>Acoes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for client in clients %}
+                <tr>
+                    <td>
+                        <a href="{{ url_for('main.client_detail', client_id=client.id) }}" class="text-decoration-none fw-semibold">
+                            {{ client.nome }}
+                        </a>
+                    </td>
+                    <td><small>{{ client.teams_email }}</small></td>
+                    <td>
+                        {% if client.is_active %}
+                            <span class="badge badge-active">Ativo</span>
+                        {% elif client.status == 'paused' %}
+                            <span class="badge badge-paused">Pausado</span>
+                        {% else %}
+                            <span class="badge badge-expired">Expirado</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if client.days_remaining <= 7 and client.days_remaining > 0 %}
+                            <span class="text-warning fw-bold">{{ client.days_remaining }}d</span>
+                        {% elif client.is_expired %}
+                            <span class="text-danger">Expirado</span>
+                        {% else %}
+                            {{ client.days_remaining }}d
+                        {% endif %}
+                    </td>
+                    <td>{{ client.tasks_completed }}</td>
+                    <td>
+                        {% if client.last_check %}
+                            <small class="text-muted">{{ client.last_check.strftime('%d/%m %H:%M') }}</small>
+                        {% else %}
+                            <small class="text-muted">-</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <a href="{{ url_for('main.client_edit', client_id=client.id) }}" class="btn btn-outline-primary" title="Editar">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            {% if client.status == 'paused' %}
+                            <form method="POST" action="{{ url_for('main.client_toggle', client_id=client.id) }}" class="d-inline">
+                                <button class="btn btn-outline-success" title="Ativar"><i class="bi bi-play"></i></button>
+                            </form>
+                            {% elif client.is_active %}
+                            <form method="POST" action="{{ url_for('main.client_toggle', client_id=client.id) }}" class="d-inline">
+                                <button class="btn btn-outline-warning" title="Pausar"><i class="bi bi-pause"></i></button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-5">
+                        <i class="bi bi-people fs-1 d-block mb-2"></i>
+                        Nenhum cliente cadastrado.
+                        <br><a href="{{ url_for('main.client_add') }}">Adicionar primeiro cliente</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
