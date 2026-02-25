@@ -6,104 +6,175 @@
     <a href="{{ url_for('main.clients') }}" class="btn btn-outline-secondary btn-sm me-3">
         <i class="bi bi-arrow-left"></i>
     </a>
-    <h4 class="fw-bold m-0">{{ 'Editar' if client else 'Novo' }} Cliente</h4>
-</div>
-
-<div class="card">
-    <div class="card-body p-4">
-        <form method="POST">
-            <div class="row g-3">
-                <!-- Dados do Cliente -->
-                <div class="col-12">
-                    <h6 class="fw-bold text-primary"><i class="bi bi-person"></i> Dados do Cliente</h6>
-                    <hr class="mt-1">
-                </div>
-
-                <div class="col-md-6">
-                    <label class="form-label">Nome *</label>
-                    <input type="text" name="nome" class="form-control" value="{{ client.nome if client else '' }}" required>
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label">Email de contato *</label>
-                    <input type="email" name="email" class="form-control" value="{{ client.email if client else '' }}" required>
-                </div>
-
-                <!-- Credenciais Teams -->
-                <div class="col-12 mt-4">
-                    <h6 class="fw-bold text-primary"><i class="bi bi-microsoft-teams"></i> Credenciais Teams</h6>
-                    <hr class="mt-1">
-                </div>
-
-                <div class="col-md-6">
-                    <label class="form-label">Email do Teams *</label>
-                    <input type="email" name="teams_email" class="form-control" value="{{ client.teams_email if client else '' }}" required>
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label">Senha do Teams *</label>
-                    <input type="password" name="teams_password" class="form-control" placeholder="{{ '(manter atual)' if client else '' }}" {{ '' if client else 'required' }}>
-                </div>
-
-                <!-- API -->
-                <div class="col-12 mt-4">
-                    <h6 class="fw-bold text-primary"><i class="bi bi-key"></i> API e Configuracoes</h6>
-                    <hr class="mt-1">
-                </div>
-
-                <div class="col-md-6">
-                    <label class="form-label">Chave API Anthropic *</label>
-                    <input type="password" name="anthropic_key" class="form-control" placeholder="{{ '(manter atual)' if client else '' }}" {{ '' if client else 'required' }}>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">Intervalo (min)</label>
-                    <input type="number" name="check_interval" class="form-control" value="{{ client.check_interval if client else 60 }}" min="15" max="1440">
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">Meses *</label>
-                    <input type="number" name="months" class="form-control" value="1" min="1" max="12" {{ 'disabled' if client else '' }}>
-                    {% if client %}
-                    <small class="text-muted">Use "Renovar" para estender</small>
-                    {% endif %}
-                </div>
-
-                <!-- Notificacoes (opcional) -->
-                <div class="col-12 mt-4">
-                    <h6 class="fw-bold text-primary"><i class="bi bi-envelope"></i> Notificacoes (opcional)</h6>
-                    <hr class="mt-1">
-                </div>
-
-                <div class="col-md-4">
-                    <label class="form-label">Email SMTP</label>
-                    <input type="email" name="smtp_email" class="form-control" value="{{ client.smtp_email if client else '' }}">
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label">Senha SMTP</label>
-                    <input type="password" name="smtp_password" class="form-control" placeholder="{{ '(manter atual)' if client else '' }}">
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label">Email de notificacao</label>
-                    <input type="email" name="notification_email" class="form-control" value="{{ client.notification_email if client else '' }}">
-                </div>
-
-                <!-- Valor (opcional, para registro) -->
-                {% if not client %}
-                <div class="col-12 mt-4">
-                    <h6 class="fw-bold text-primary"><i class="bi bi-cash"></i> Pagamento</h6>
-                    <hr class="mt-1">
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label">Valor pago (R$)</label>
-                    <input type="number" name="amount" class="form-control" step="0.01" value="0">
-                </div>
-                {% endif %}
-
-                <div class="col-12 mt-4">
-                    <button type="submit" class="btn btn-primary px-4">
-                        <i class="bi bi-check-lg"></i> {{ 'Salvar' if client else 'Cadastrar' }}
-                    </button>
-                    <a href="{{ url_for('main.clients') }}" class="btn btn-outline-secondary ms-2">Cancelar</a>
-                </div>
-            </div>
-        </form>
+    <div>
+        <h4 class="fw-bold m-0">{{ 'Editar' if client else 'Novo' }} Cliente</h4>
+        <small class="text-muted">{% if client %}Atualize as informacoes do cliente{% else %}Preencha os dados para cadastrar um novo cliente{% endif %}</small>
     </div>
 </div>
+
+<form method="POST">
+    <div class="row g-4">
+        <!-- Dados do Cliente -->
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white border-0 py-3">
+                    <h6 class="fw-bold m-0">
+                        <i class="bi bi-person-fill text-primary me-2"></i>Dados do Cliente
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-medium">Nome <span class="text-danger">*</span></label>
+                        <input type="text" name="nome" class="form-control" value="{{ client.nome if client else '' }}" required placeholder="Nome completo do cliente">
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label fw-medium">Email de contato <span class="text-danger">*</span></label>
+                        <input type="email" name="email" class="form-control" value="{{ client.email if client else '' }}" required placeholder="email@exemplo.com">
+                        <small class="text-muted">Email para comunicacao com o cliente</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Credenciais Teams -->
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white border-0 py-3">
+                    <h6 class="fw-bold m-0">
+                        <i class="bi bi-microsoft-teams text-info me-2"></i>Credenciais Teams
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-medium">Email do Teams <span class="text-danger">*</span></label>
+                        <input type="email" name="teams_email" class="form-control" value="{{ client.teams_email if client else '' }}" required placeholder="usuario@teams.com">
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label fw-medium">Senha do Teams <span class="text-danger">*</span></label>
+                        <input type="password" name="teams_password" class="form-control" placeholder="{{ '••••••••' if client else 'Senha do Teams' }}" {{ '' if client else 'required' }}>
+                        {% if client %}
+                        <small class="text-muted">Deixe em branco para manter a senha atual</small>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- API e Configuracoes -->
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white border-0 py-3">
+                    <h6 class="fw-bold m-0">
+                        <i class="bi bi-key-fill text-warning me-2"></i>API e Configuracoes
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-medium">Chave API Anthropic <span class="text-danger">*</span></label>
+                        <input type="password" name="anthropic_key" class="form-control" placeholder="{{ '••••••••••••••••••••' if client else 'sk-ant-...' }}" {{ '' if client else 'required' }}>
+                        {% if client %}
+                        <small class="text-muted">Deixe em branco para manter a chave atual</small>
+                        {% endif %}
+                    </div>
+                    <div class="row">
+                        <div class="col-6">
+                            <label class="form-label fw-medium">Intervalo (min)</label>
+                            <input type="number" name="check_interval" class="form-control" value="{{ client.check_interval if client else 60 }}" min="15" max="1440">
+                            <small class="text-muted">Tempo entre verificacoes</small>
+                        </div>
+                        {% if not client %}
+                        <div class="col-6">
+                            <label class="form-label fw-medium">Meses <span class="text-danger">*</span></label>
+                            <input type="number" name="months" class="form-control" value="1" min="1" max="12">
+                            <small class="text-muted">Duracao inicial</small>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notificacoes -->
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white border-0 py-3">
+                    <h6 class="fw-bold m-0">
+                        <i class="bi bi-bell-fill text-success me-2"></i>Notificacoes
+                        <span class="badge bg-secondary-subtle text-secondary ms-2">Opcional</span>
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-medium">Email SMTP</label>
+                        <input type="email" name="smtp_email" class="form-control" value="{{ client.smtp_email if client else '' }}" placeholder="notificacao@gmail.com">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-medium">Senha SMTP</label>
+                        <input type="password" name="smtp_password" class="form-control" placeholder="{{ '••••••••' if client and client.smtp_password else 'Senha de app' }}">
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label fw-medium">Email de destino</label>
+                        <input type="email" name="notification_email" class="form-control" value="{{ client.notification_email if client else '' }}" placeholder="destino@exemplo.com">
+                        <small class="text-muted">Email que recebera as notificacoes</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if not client %}
+        <!-- Pagamento Inicial -->
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 py-3">
+                    <h6 class="fw-bold m-0">
+                        <i class="bi bi-cash-stack text-success me-2"></i>Pagamento Inicial
+                        <span class="badge bg-secondary-subtle text-secondary ms-2">Opcional</span>
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-0">
+                        <label class="form-label fw-medium">Valor pago (R$)</label>
+                        <div class="input-group">
+                            <span class="input-group-text">R$</span>
+                            <input type="number" name="amount" class="form-control" step="0.01" value="0" placeholder="0.00">
+                        </div>
+                        <small class="text-muted">Registre o valor pago pelo cliente</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Botoes -->
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body py-3 d-flex justify-content-between align-items-center">
+                    <div>
+                        <small class="text-muted"><span class="text-danger">*</span> Campos obrigatorios</small>
+                    </div>
+                    <div>
+                        <a href="{{ url_for('main.clients') }}" class="btn btn-outline-secondary me-2">
+                            <i class="bi bi-x-lg"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-primary px-4">
+                            <i class="bi bi-check-lg"></i> {{ 'Salvar Alteracoes' if client else 'Cadastrar Cliente' }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.form-label {
+    font-size: 0.875rem;
+    margin-bottom: 0.25rem;
+}
+.bg-secondary-subtle {
+    background-color: #f3f4f6;
+}
+</style>
 {% endblock %}

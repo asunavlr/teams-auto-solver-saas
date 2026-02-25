@@ -2,124 +2,200 @@
 {% block title %}{{ client.nome }} - Teams Auto Solver{% endblock %}
 
 {% block content %}
+<!-- Header -->
 <div class="d-flex align-items-center mb-4">
     <a href="{{ url_for('main.clients') }}" class="btn btn-outline-secondary btn-sm me-3">
         <i class="bi bi-arrow-left"></i>
     </a>
-    <h4 class="fw-bold m-0">{{ client.nome }}</h4>
-    <div class="ms-3">
-        {% if client.is_active %}
-            <span class="badge badge-active fs-6">Ativo</span>
-        {% elif client.status == 'paused' %}
-            <span class="badge badge-paused fs-6">Pausado</span>
-        {% else %}
-            <span class="badge badge-expired fs-6">Expirado</span>
-        {% endif %}
-    </div>
-</div>
-
-<!-- Info Cards -->
-<div class="row g-3 mb-4">
-    <div class="col-md-3">
-        <div class="card p-3 text-center">
-            <div class="fs-3 fw-bold text-primary">{{ client.tasks_completed }}</div>
-            <small class="text-muted">Tarefas Concluidas</small>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card p-3 text-center">
-            <div class="fs-3 fw-bold {% if client.days_remaining <= 7 %}text-warning{% elif client.is_expired %}text-danger{% else %}text-success{% endif %}">
-                {{ client.days_remaining }}d
-            </div>
-            <small class="text-muted">Dias Restantes</small>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card p-3 text-center">
-            <div class="fs-5 fw-bold">{{ client.expires_at.strftime('%d/%m/%Y') }}</div>
-            <small class="text-muted">Expira em</small>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card p-3 text-center">
-            <div class="fs-5 fw-bold">{{ client.check_interval }}min</div>
-            <small class="text-muted">Intervalo</small>
-        </div>
-    </div>
-</div>
-
-<!-- Actions -->
-<div class="card mb-4">
-    <div class="card-body d-flex flex-wrap gap-2">
-        <a href="{{ url_for('main.client_edit', client_id=client.id) }}" class="btn btn-outline-primary">
-            <i class="bi bi-pencil"></i> Editar
-        </a>
-
-        <!-- Renovar -->
-        <form method="POST" action="{{ url_for('main.client_renew', client_id=client.id) }}" class="d-inline">
-            <div class="input-group input-group-sm" style="width: 220px;">
-                <input type="number" name="months" class="form-control" value="1" min="1" max="12">
-                <input type="number" name="amount" class="form-control" value="0" step="0.01" placeholder="R$">
-                <button class="btn btn-success" type="submit"><i class="bi bi-arrow-clockwise"></i> Renovar</button>
-            </div>
-        </form>
-
-        <!-- Pausar/Ativar -->
-        <form method="POST" action="{{ url_for('main.client_toggle', client_id=client.id) }}" class="d-inline">
-            {% if client.status == 'paused' %}
-                <button class="btn btn-outline-success"><i class="bi bi-play"></i> Ativar</button>
-            {% elif client.is_active %}
-                <button class="btn btn-outline-warning"><i class="bi bi-pause"></i> Pausar</button>
+    <div class="flex-grow-1">
+        <div class="d-flex align-items-center">
+            <h4 class="fw-bold m-0 me-3">{{ client.nome }}</h4>
+            {% if client.is_active %}
+                <span class="badge badge-success"><i class="bi bi-check-lg"></i> Ativo</span>
+            {% elif client.status == 'paused' %}
+                <span class="badge badge-skipped"><i class="bi bi-pause-fill"></i> Pausado</span>
+            {% else %}
+                <span class="badge badge-error"><i class="bi bi-x-lg"></i> Expirado</span>
             {% endif %}
-        </form>
-
-        <!-- Executar agora -->
-        <form method="POST" action="{{ url_for('main.client_run_now', client_id=client.id) }}" class="d-inline">
-            <button class="btn btn-outline-info"><i class="bi bi-play-circle"></i> Executar Agora</button>
-        </form>
-
-        <!-- Excluir -->
-        <form method="POST" action="{{ url_for('main.client_delete', client_id=client.id) }}" class="d-inline ms-auto"
-              onsubmit="return confirm('Tem certeza que deseja excluir {{ client.nome }}?')">
-            <button class="btn btn-outline-danger"><i class="bi bi-trash"></i> Excluir</button>
-        </form>
+        </div>
+        <small class="text-muted">{{ client.email }} | Cadastrado em {{ client.created_at.strftime('%d/%m/%Y') }}</small>
     </div>
 </div>
 
-<!-- Info -->
+<!-- Stats Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body p-3">
+                <div class="d-flex align-items-center">
+                    <div class="rounded-circle bg-primary bg-opacity-10 p-2 me-3">
+                        <i class="bi bi-check2-square text-primary fs-5"></i>
+                    </div>
+                    <div>
+                        <div class="fs-3 fw-bold text-primary">{{ client.tasks_completed }}</div>
+                        <small class="text-muted">Tarefas</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body p-3">
+                <div class="d-flex align-items-center">
+                    <div class="rounded-circle {% if client.days_remaining <= 7 and client.days_remaining > 0 %}bg-warning{% elif client.is_expired %}bg-danger{% else %}bg-success{% endif %} bg-opacity-10 p-2 me-3">
+                        <i class="bi bi-calendar-check {% if client.days_remaining <= 7 and client.days_remaining > 0 %}text-warning{% elif client.is_expired %}text-danger{% else %}text-success{% endif %} fs-5"></i>
+                    </div>
+                    <div>
+                        <div class="fs-3 fw-bold {% if client.days_remaining <= 7 and client.days_remaining > 0 %}text-warning{% elif client.is_expired %}text-danger{% else %}text-success{% endif %}">
+                            {{ client.days_remaining }}d
+                        </div>
+                        <small class="text-muted">Restantes</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body p-3">
+                <div class="d-flex align-items-center">
+                    <div class="rounded-circle bg-info bg-opacity-10 p-2 me-3">
+                        <i class="bi bi-clock-history text-info fs-5"></i>
+                    </div>
+                    <div>
+                        <div class="fs-5 fw-bold">{{ client.check_interval }}min</div>
+                        <small class="text-muted">Intervalo</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body p-3">
+                <div class="d-flex align-items-center">
+                    <div class="rounded-circle bg-secondary bg-opacity-10 p-2 me-3">
+                        <i class="bi bi-calendar-event text-secondary fs-5"></i>
+                    </div>
+                    <div>
+                        <div class="fs-5 fw-bold">{{ client.expires_at.strftime('%d/%m/%y') }}</div>
+                        <small class="text-muted">Expira em</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-3">
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <a href="{{ url_for('main.client_edit', client_id=client.id) }}" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-pencil"></i> Editar
+            </a>
+
+            <!-- Executar agora -->
+            <form method="POST" action="{{ url_for('main.client_run_now', client_id=client.id) }}" class="d-inline">
+                <button class="btn btn-info btn-sm text-white"><i class="bi bi-play-circle"></i> Executar Agora</button>
+            </form>
+
+            <!-- Pausar/Ativar -->
+            <form method="POST" action="{{ url_for('main.client_toggle', client_id=client.id) }}" class="d-inline">
+                {% if client.status == 'paused' %}
+                    <button class="btn btn-success btn-sm"><i class="bi bi-play-fill"></i> Ativar</button>
+                {% elif client.is_active %}
+                    <button class="btn btn-warning btn-sm"><i class="bi bi-pause-fill"></i> Pausar</button>
+                {% endif %}
+            </form>
+
+            <div class="vr mx-2"></div>
+
+            <!-- Renovar -->
+            <form method="POST" action="{{ url_for('main.client_renew', client_id=client.id) }}" class="d-inline">
+                <div class="input-group input-group-sm" style="width: auto;">
+                    <input type="number" name="months" class="form-control" value="1" min="1" max="12" style="width: 60px;" placeholder="Meses">
+                    <input type="number" name="amount" class="form-control" value="0" step="0.01" style="width: 80px;" placeholder="R$">
+                    <button class="btn btn-success" type="submit"><i class="bi bi-arrow-clockwise"></i> Renovar</button>
+                </div>
+            </form>
+
+            <!-- Excluir -->
+            <form method="POST" action="{{ url_for('main.client_delete', client_id=client.id) }}" class="d-inline ms-auto"
+                  onsubmit="return confirm('Tem certeza que deseja excluir {{ client.nome }}? Esta acao nao pode ser desfeita.')">
+                <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i> Excluir</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Info Panels -->
 <div class="row g-3 mb-4">
     <div class="col-md-6">
-        <div class="card">
-            <div class="card-header bg-white"><h6 class="fw-bold m-0">Informacoes</h6></div>
-            <div class="card-body">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-0 py-3">
+                <h6 class="fw-bold m-0"><i class="bi bi-person-lines-fill text-primary me-2"></i>Informacoes do Cliente</h6>
+            </div>
+            <div class="card-body pt-0">
                 <table class="table table-sm mb-0">
-                    <tr><td class="text-muted">Email contato</td><td>{{ client.email }}</td></tr>
-                    <tr><td class="text-muted">Email Teams</td><td>{{ client.teams_email }}</td></tr>
-                    <tr><td class="text-muted">Notificacao</td><td>{{ client.notification_email or '-' }}</td></tr>
-                    <tr><td class="text-muted">Cadastrado em</td><td>{{ client.created_at.strftime('%d/%m/%Y %H:%M') }}</td></tr>
-                    <tr><td class="text-muted">Ultimo check</td><td>{{ client.last_check.strftime('%d/%m/%Y %H:%M') if client.last_check else 'Nunca' }}</td></tr>
+                    <tbody>
+                        <tr>
+                            <td class="text-muted border-0" style="width: 140px;"><i class="bi bi-envelope me-2"></i>Email contato</td>
+                            <td class="border-0">{{ client.email }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted"><i class="bi bi-microsoft-teams me-2"></i>Email Teams</td>
+                            <td><code class="bg-light px-2 py-1 rounded small">{{ client.teams_email }}</code></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted"><i class="bi bi-bell me-2"></i>Notificacao</td>
+                            <td>{{ client.notification_email or '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted"><i class="bi bi-clock me-2"></i>Ultimo check</td>
+                            <td>
+                                {% if client.last_check %}
+                                    {{ client.last_check.strftime('%d/%m/%Y %H:%M') }}
+                                {% else %}
+                                    <span class="text-muted">Nunca executado</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </tbody>
                 </table>
             </div>
         </div>
     </div>
 
     <div class="col-md-6">
-        <div class="card">
-            <div class="card-header bg-white"><h6 class="fw-bold m-0">Pagamentos</h6></div>
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-0 py-3">
+                <h6 class="fw-bold m-0"><i class="bi bi-credit-card text-success me-2"></i>Historico de Pagamentos</h6>
+            </div>
             <div class="card-body p-0">
                 <table class="table table-sm mb-0">
-                    <thead class="table-light">
-                        <tr><th>Data</th><th>Meses</th><th>Valor</th></tr>
+                    <thead>
+                        <tr class="bg-light">
+                            <th class="ps-3" style="font-weight: 600; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7280;">Data</th>
+                            <th style="font-weight: 600; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7280;">Meses</th>
+                            <th class="pe-3" style="font-weight: 600; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7280;">Valor</th>
+                        </tr>
                     </thead>
                     <tbody>
                         {% for p in payments %}
                         <tr>
-                            <td>{{ p.created_at.strftime('%d/%m/%Y') }}</td>
-                            <td>{{ p.months }}</td>
-                            <td>R$ {{ '%.2f'|format(p.amount) }}</td>
+                            <td class="ps-3">{{ p.created_at.strftime('%d/%m/%Y') }}</td>
+                            <td><span class="badge bg-light text-dark border">{{ p.months }} mes{% if p.months > 1 %}es{% endif %}</span></td>
+                            <td class="pe-3 fw-semibold text-success">R$ {{ '%.2f'|format(p.amount) }}</td>
                         </tr>
                         {% else %}
-                        <tr><td colspan="3" class="text-center text-muted py-3">Nenhum registro</td></tr>
+                        <tr>
+                            <td colspan="3" class="text-center text-muted py-4">
+                                <i class="bi bi-wallet2 d-block mb-1 opacity-50"></i>
+                                Nenhum pagamento registrado
+                            </td>
+                        </tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -129,41 +205,114 @@
 </div>
 
 <!-- Task History -->
-<div class="card">
-    <div class="card-header bg-white">
-        <h6 class="fw-bold m-0"><i class="bi bi-clock-history"></i> Historico de Tarefas</h6>
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+        <h6 class="fw-bold m-0"><i class="bi bi-clock-history text-info me-2"></i>Historico de Tarefas</h6>
+        <a href="{{ url_for('main.logs', client_id=client.id) }}" class="btn btn-sm btn-outline-primary">
+            Ver todos <i class="bi bi-arrow-right"></i>
+        </a>
     </div>
     <div class="table-responsive">
-        <table class="table table-hover mb-0">
-            <thead class="table-light">
-                <tr>
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr class="bg-light">
+                    <th class="ps-3" style="width: 130px;">Data</th>
                     <th>Tarefa</th>
-                    <th>Disciplina</th>
-                    <th>Formato</th>
-                    <th>Status</th>
-                    <th>Data</th>
+                    <th style="width: 150px;">Disciplina</th>
+                    <th style="width: 80px;">Formato</th>
+                    <th style="width: 100px;">Status</th>
+                    <th>Erro</th>
                 </tr>
             </thead>
             <tbody>
                 {% for log in task_logs %}
                 <tr>
-                    <td>{{ log.task_name }}</td>
-                    <td>{{ log.discipline or '-' }}</td>
-                    <td><span class="badge bg-secondary">{{ log.format or '-' }}</span></td>
+                    <td class="ps-3"><small class="text-muted">{{ log.created_at.strftime('%d/%m/%Y %H:%M') }}</small></td>
                     <td>
-                        {% if log.status == 'success' %}
-                            <span class="badge bg-success">OK</span>
+                        <div class="text-truncate" style="max-width: 250px;" title="{{ log.task_name }}">
+                            {{ log.task_name }}
+                        </div>
+                    </td>
+                    <td>
+                        <small class="text-muted text-truncate d-inline-block" style="max-width: 140px;">{{ log.discipline or '-' }}</small>
+                    </td>
+                    <td>
+                        {% if log.format %}
+                            {% if log.format == 'docx' %}
+                                <span class="badge bg-primary-subtle text-primary"><i class="bi bi-file-earmark-word"></i> DOCX</span>
+                            {% elif log.format == 'pdf' %}
+                                <span class="badge bg-danger-subtle text-danger"><i class="bi bi-file-earmark-pdf"></i> PDF</span>
+                            {% elif log.format == 'texto' %}
+                                <span class="badge bg-secondary-subtle text-secondary"><i class="bi bi-file-earmark-text"></i> Texto</span>
+                            {% elif log.format in ['py', 'js', 'html', 'css', 'java', 'cpp', 'c'] %}
+                                <span class="badge bg-success-subtle text-success"><i class="bi bi-file-earmark-code"></i> {{ log.format|upper }}</span>
+                            {% elif log.format == 'zip' %}
+                                <span class="badge bg-warning-subtle text-warning"><i class="bi bi-file-earmark-zip"></i> ZIP</span>
+                            {% else %}
+                                <span class="badge bg-light text-dark border">{{ log.format|upper }}</span>
+                            {% endif %}
                         {% else %}
-                            <span class="badge bg-danger" title="{{ log.error_msg }}">Erro</span>
+                            <span class="text-muted">-</span>
                         {% endif %}
                     </td>
-                    <td><small class="text-muted">{{ log.created_at.strftime('%d/%m/%Y %H:%M') }}</small></td>
+                    <td>
+                        {% if log.status == 'success' %}
+                            <span class="badge badge-success"><i class="bi bi-check-lg"></i> Enviado</span>
+                        {% elif log.status == 'not_found' %}
+                            <span class="badge badge-secondary"><i class="bi bi-search"></i> Nao encontrado</span>
+                        {% elif log.status == 'group' %}
+                            <span class="badge badge-group"><i class="bi bi-people"></i> Grupo</span>
+                        {% elif log.status == 'skipped' %}
+                            <span class="badge badge-skipped"><i class="bi bi-skip-forward"></i> Pulado</span>
+                        {% else %}
+                            <span class="badge badge-error"><i class="bi bi-x-lg"></i> Erro</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if log.error_msg %}
+                        <small class="text-danger text-truncate d-inline-block" style="max-width: 150px;" title="{{ log.error_msg }}">
+                            {{ log.error_msg }}
+                        </small>
+                        {% else %}
+                        <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
                 </tr>
                 {% else %}
-                <tr><td colspan="5" class="text-center text-muted py-4">Nenhuma tarefa processada</td></tr>
+                <tr>
+                    <td colspan="6" class="text-center py-5 text-muted">
+                        <i class="bi bi-inbox fs-1 d-block mb-2 opacity-50"></i>
+                        Nenhuma tarefa processada ainda
+                    </td>
+                </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.table th {
+    font-weight: 600;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #6b7280;
+    border-bottom: none;
+}
+.bg-primary-subtle { background-color: #eff6ff; }
+.bg-success-subtle { background-color: #f0fdf4; }
+.bg-danger-subtle { background-color: #fef2f2; }
+.bg-warning-subtle { background-color: #fffbeb; }
+.bg-secondary-subtle { background-color: #f9fafb; }
+.text-primary { color: #3b82f6 !important; }
+.text-success { color: #22c55e !important; }
+.text-danger { color: #ef4444 !important; }
+.text-warning { color: #f59e0b !important; }
+code {
+    font-size: 0.75rem;
+}
+</style>
 {% endblock %}
