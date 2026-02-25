@@ -445,7 +445,7 @@ REGRAS DA RESPOSTA:
     # Lista de modelos para tentar (fallback)
     modelos = [
         ("claude-sonnet-4-20250514", "Sonnet 4"),
-        ("claude-3-5-haiku-20241022", "Haiku 3.5"),
+        ("claude-haiku-4-5-20251001", "Haiku 4.5"),
     ]
 
     for modelo_id, modelo_nome in modelos:
