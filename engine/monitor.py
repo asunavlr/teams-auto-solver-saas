@@ -432,34 +432,16 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
                 tarefa_info["screenshots"].append(str(ss_path))
                 log(f"  Screenshot {page_num} do PDF capturado", config.nome)
 
-                # Tenta ir para proxima pagina
-                navegou = False
+                # Navega para proxima secao do documento (15 scrolls/setas)
                 try:
-                    # Tenta botoes de seta para baixo/proxima pagina
-                    next_btn = browser.page.locator(
-                        'button[aria-label*="Next"], button[aria-label*="Próxim"], '
-                        'button[aria-label*="Proxim"], button[aria-label*="next"], '
-                        'button[aria-label*="Down"], button[aria-label*="Baixo"], '
-                        'button[aria-label*="baixo"], button[aria-label*="down"], '
-                        '[data-icon-name="ChevronDown"], [data-icon-name="ChevronRight"], '
-                        'button:has-text(">"), button:has-text("↓"), '
-                        '[aria-label*="page"], button[title*="Next"], button[title*="Próxim"], '
-                        'button[title*="Down"], button[title*="Baixo"]'
-                    ).first
-                    await next_btn.click(timeout=3000)
-                    await asyncio.sleep(2)
-                    navegou = True
+                    for _ in range(15):
+                        await browser.page.keyboard.press("ArrowDown")
+                        await asyncio.sleep(0.1)
+                    # Scroll adicional para garantir
+                    await browser.page.mouse.wheel(0, 500)
+                    await asyncio.sleep(1)
                 except Exception:
-                    pass
-
-                # Fallback: usa scroll se não encontrou botão
-                if not navegou:
-                    try:
-                        await browser.page.mouse.wheel(0, 800)
-                        await asyncio.sleep(1)
-                        navegou = True
-                    except Exception:
-                        break
+                    break
 
                 # Se nao navegou de nenhuma forma, para o loop
                 if not navegou:
@@ -521,23 +503,32 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
 
                 # Tira screenshots do preview (ate 10 paginas)
                 max_doc_pages = 10
+                ultimo_hash = None
                 for page_num in range(1, max_doc_pages + 1):
                     ss_path = data_dir / f"doc_{ext.replace('.', '')}_{page_num}.png"
                     await browser.page.screenshot(path=str(ss_path))
+
+                    # Verifica se o screenshot é igual ao anterior (fim do documento)
+                    with open(ss_path, "rb") as f:
+                        current_hash = hashlib.md5(f.read()).hexdigest()
+
+                    if current_hash == ultimo_hash:
+                        log(f"  Pagina {page_num} igual a anterior, fim do documento", config.nome)
+                        ss_path.unlink()
+                        break
+
+                    ultimo_hash = current_hash
                     tarefa_info["screenshots"].append(str(ss_path))
                     log(f"  Screenshot {page_num} do documento capturado", config.nome)
 
-                    # Tenta ir para proxima pagina
+                    # Navega para proxima secao (15 scrolls/setas)
                     try:
-                        next_btn = browser.page.locator(
-                            'button[aria-label*="Next"], button[aria-label*="Próxim"], '
-                            'button[aria-label*="Proxim"], button[aria-label*="next"], '
-                            '[data-icon-name="ChevronRight"], button:has-text(">")'
-                        ).first
-                        await next_btn.click(timeout=2000)
+                        for _ in range(15):
+                            await browser.page.keyboard.press("ArrowDown")
+                            await asyncio.sleep(0.1)
+                        await browser.page.mouse.wheel(0, 500)
                         await asyncio.sleep(1)
                     except Exception:
-                        # Nao tem mais paginas ou botao nao encontrado
                         break
 
                 # Fecha o preview
