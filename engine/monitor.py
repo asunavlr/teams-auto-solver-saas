@@ -420,17 +420,37 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
                 log(f"  Screenshot {page_num} do PDF capturado", config.nome)
 
                 # Tenta ir para proxima pagina
+                navegou = False
                 try:
+                    # Tenta botoes de seta para baixo/proxima pagina
                     next_btn = browser.page.locator(
                         'button[aria-label*="Next"], button[aria-label*="Próxim"], '
                         'button[aria-label*="Proxim"], button[aria-label*="next"], '
-                        '[data-icon-name="ChevronRight"], button:has-text(">"), '
-                        '[aria-label*="page"], button[title*="Next"], button[title*="Próxim"]'
+                        'button[aria-label*="Down"], button[aria-label*="Baixo"], '
+                        'button[aria-label*="baixo"], button[aria-label*="down"], '
+                        '[data-icon-name="ChevronDown"], [data-icon-name="ChevronRight"], '
+                        'button:has-text(">"), button:has-text("↓"), '
+                        '[aria-label*="page"], button[title*="Next"], button[title*="Próxim"], '
+                        'button[title*="Down"], button[title*="Baixo"]'
                     ).first
                     await next_btn.click(timeout=3000)
                     await asyncio.sleep(2)
+                    navegou = True
                 except Exception:
-                    # Nao tem mais paginas
+                    pass
+
+                # Fallback: usa scroll se não encontrou botão
+                if not navegou:
+                    try:
+                        await browser.page.mouse.wheel(0, 800)
+                        await asyncio.sleep(1)
+                        navegou = True
+                    except Exception:
+                        # Nao conseguiu navegar, provavelmente acabou as paginas
+                        break
+
+                # Se nao navegou de nenhuma forma, para o loop
+                if not navegou:
                     break
 
             await fechar_preview(browser)
