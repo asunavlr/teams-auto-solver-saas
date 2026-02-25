@@ -48,8 +48,11 @@ class TeamsBrowser:
             raise RuntimeError("Navegador nao iniciado. Chame start() primeiro.")
 
         logger.info("Iniciando login no Teams...")
-        await self.page.goto(self.TEAMS_URL)
-        await self.page.wait_for_load_state("networkidle")
+        await self.page.goto(self.TEAMS_URL, wait_until="domcontentloaded")
+        try:
+            await self.page.wait_for_load_state("networkidle", timeout=15000)
+        except Exception:
+            logger.info("networkidle timeout no goto, continuando...")
         await asyncio.sleep(5)
 
         if await self._is_logged_in():
@@ -74,7 +77,10 @@ class TeamsBrowser:
             await next_btn.wait_for(state="visible", timeout=10000)
             await next_btn.click()
 
-            await self.page.wait_for_load_state("networkidle")
+            try:
+                await self.page.wait_for_load_state("networkidle", timeout=15000)
+            except Exception:
+                pass
             await asyncio.sleep(3)
 
             # Pagina de senha (pode ser da instituicao)
@@ -88,7 +94,10 @@ class TeamsBrowser:
             await submit_btn.wait_for(state="visible", timeout=10000)
             await submit_btn.click()
 
-            await self.page.wait_for_load_state("networkidle")
+            try:
+                await self.page.wait_for_load_state("networkidle", timeout=15000)
+            except Exception:
+                pass
             await asyncio.sleep(3)
 
             try:
@@ -101,7 +110,10 @@ class TeamsBrowser:
             except Exception:
                 pass
 
-            await self.page.wait_for_load_state("networkidle")
+            try:
+                await self.page.wait_for_load_state("networkidle", timeout=15000)
+            except Exception:
+                pass
             await asyncio.sleep(5)
 
             if await self._is_logged_in():

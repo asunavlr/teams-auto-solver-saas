@@ -275,26 +275,48 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
         return False
 
     # Clica em Atribuicoes
-    assignments_btn = browser.page.locator(
-        'button:has-text("Assignments"), button:has-text("Atribuições"), button:has-text("Atribuicoes")'
-    ).first
-    await assignments_btn.click(timeout=10000)
-    await asyncio.sleep(4)
+    try:
+        assignments_btn = browser.page.locator(
+            'button:has-text("Assignments"), button:has-text("Atribuições"), button:has-text("Atribuicoes")'
+        ).first
+        await assignments_btn.click(timeout=10000)
+    except Exception:
+        log("Botao Assignments nao encontrado, tentando via URL...", config.nome)
+        await browser.page.goto("https://teams.microsoft.com/_#/school/assignments")
+    await asyncio.sleep(5)
 
+    # Debug: mostra todos os frames
+    all_frames = browser.page.frames
+    log(f"  Frames encontrados: {len(all_frames)}", config.nome)
+    for f in all_frames:
+        if f.url and f.url != "about:blank":
+            log(f"  Frame URL: {f.url[:100]}", config.nome)
+
+    # Busca frame de assignments
     frame = None
     for f in browser.page.frames:
-        if "assignments" in f.url.lower():
+        url_lower = f.url.lower()
+        if "assignments" in url_lower or "classroom" in url_lower or "edu" in url_lower:
             frame = f
+            log(f"  Frame de assignments encontrado!", config.nome)
             break
+
+    # Se nao achou frame, usa a pagina principal
+    if not frame:
+        log("  Nenhum frame de assignments, usando pagina principal", config.nome)
+        frame = browser.page
+
+    # Screenshot para debug
+    await browser.page.screenshot(path=str(data_dir / "assignments_page.png"))
 
     # Busca em cada aba
     tarefa_encontrada = False
-    for tab in ["Em breve", "Em atraso", "Upcoming", "Past due"]:
-        if frame and not tarefa_encontrada:
+    for tab in ["Em breve", "Em atraso", "Upcoming", "Past due", "Assigned", "Atribuído"]:
+        if not tarefa_encontrada:
             try:
                 tab_btn = frame.locator(f'text="{tab}"').first
                 await tab_btn.click(timeout=5000)
-                await asyncio.sleep(2)
+                await asyncio.sleep(3)
 
                 if nome_tarefa and await buscar_tarefa_no_frame(frame, nome_tarefa):
                     await asyncio.sleep(4)
@@ -597,7 +619,17 @@ async def ciclo_monitoramento_cliente(config: ClientConfig) -> dict:
         page_content = await browser.page.inner_text("body")
         if "Sign in" in page_content or "Entrar" in page_content:
             log("Sessao expirada, fazendo login...", config.nome)
-            await browser.login()
+            login_ok = await browser.login()
+            if not login_ok:
+                log("Login falhou! Abortando ciclo.", config.nome)
+                resultado["error"] += 1
+                resultado["tasks"].append({
+                    "name": "Login",
+                    "discipline": "",
+                    "status": "error",
+                    "error": "Falha no login do Teams",
+                })
+                return resultado
             await asyncio.sleep(5)
 
         processadas = carregar_processadas(config.processadas_path)
