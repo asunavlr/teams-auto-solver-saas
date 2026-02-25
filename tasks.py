@@ -4,6 +4,12 @@ Celery tasks para execucao paralela de clientes.
 Cada worker pode executar tarefas de clientes independentemente.
 """
 
+import os
+import sys
+
+# Adiciona o diretorio atual ao path para encontrar modulos
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 import asyncio
 from datetime import datetime
 from celery import Celery
