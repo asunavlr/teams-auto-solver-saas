@@ -434,72 +434,59 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
                 pass
         frame = await recuperar_frame_tarefa(browser, frame, nome_tarefa)
 
-    # Processa documentos anexados
+    # Processa documentos anexados (abre preview e tira screenshots, como PDF)
     tem_docx_anexo = any(ext in content_lower for ext in [".docx", ".doc"])
     tem_xlsx_anexo = any(ext in content_lower for ext in [".xlsx", ".xls"])
 
     if tem_docx_anexo or tem_xlsx_anexo:
-        log("Documento(s) anexado(s), baixando...", config.nome)
+        log("Documento(s) anexado(s), abrindo preview...", config.nome)
         doc_extensions = []
         if tem_docx_anexo:
-            doc_extensions.extend([".docx", ".doc"])
+            doc_extensions.extend([".docx"])  # Só .docx para evitar duplicatas
         if tem_xlsx_anexo:
-            doc_extensions.extend([".xlsx", ".xls"])
+            doc_extensions.extend([".xlsx"])
 
         for ext in doc_extensions:
             if ext not in content_lower:
                 continue
             try:
-                # Tenta encontrar o elemento clicavel (botao/link) que contem o texto do arquivo
-                doc_link = None
+                # Encontra e clica no documento para abrir preview
+                doc_link = frame.locator(f'text=/{re.escape(ext)}/i').first
+                await doc_link.click(timeout=10000)
+                await asyncio.sleep(4)  # Espera o preview carregar
 
-                # Primeiro tenta botao ou link que contenha a extensao
-                for selector in [
-                    f'button:has-text("{ext}")',
-                    f'a:has-text("{ext}")',
-                    f'[role="button"]:has-text("{ext}")',
-                    f'div[tabindex]:has-text("{ext}")',
-                    f'[data-is-focusable="true"]:has-text("{ext}")',
-                ]:
+                # Tira screenshots do preview (ate 10 paginas)
+                max_doc_pages = 10
+                for page_num in range(1, max_doc_pages + 1):
+                    ss_path = data_dir / f"doc_{ext.replace('.', '')}_{page_num}.png"
+                    await browser.page.screenshot(path=str(ss_path))
+                    tarefa_info["screenshots"].append(str(ss_path))
+                    log(f"  Screenshot {page_num} do documento capturado", config.nome)
+
+                    # Tenta ir para proxima pagina
                     try:
-                        loc = frame.locator(selector).first
-                        if await loc.count() > 0 and await loc.is_visible(timeout=2000):
-                            doc_link = loc
-                            break
+                        next_btn = browser.page.locator(
+                            'button[aria-label*="Next"], button[aria-label*="Próxim"], '
+                            'button[aria-label*="Proxim"], button[aria-label*="next"], '
+                            '[data-icon-name="ChevronRight"], button:has-text(">")'
+                        ).first
+                        await next_btn.click(timeout=2000)
+                        await asyncio.sleep(1)
                     except Exception:
-                        continue
+                        # Nao tem mais paginas ou botao nao encontrado
+                        break
 
-                # Fallback: encontra o texto e tenta clicar
-                if not doc_link:
-                    doc_link = frame.locator(f'text=/{re.escape(ext)}/i').first
+                # Fecha o preview
+                await fechar_preview(browser)
+                frame = await recuperar_frame_tarefa(browser, frame, nome_tarefa)
 
-                async with browser.page.expect_download(timeout=30000) as download_info:
-                    await doc_link.click(timeout=10000)
-                download = await download_info.value
-                download_path = str(data_dir / download.suggested_filename)
-                await download.save_as(download_path)
-
-                texto_extraido = ""
-                if download_path.endswith((".docx", ".doc")):
-                    try:
-                        doc = Document(download_path)
-                        texto_extraido = "\n".join(p.text for p in doc.paragraphs if p.text.strip())
-                    except Exception:
-                        pass
-                elif download_path.endswith((".xlsx", ".xls")):
-                    try:
-                        from openpyxl import load_workbook
-                        wb = load_workbook(download_path)
-                        for ws in wb.worksheets:
-                            for row in ws.iter_rows(values_only=True):
-                                texto_extraido += " | ".join(str(c) if c else "" for c in row) + "\n"
-                    except Exception:
-                        pass
-
-                if texto_extraido:
-                    tarefa_info["instrucoes"] += f"\n\nCONTEUDO DO DOCUMENTO ANEXADO ({ext}):\n{texto_extraido[:3000]}"
             except Exception as e:
-                log(f"  Erro ao baixar documento {ext}: {e}", config.nome)
+                log(f"  Erro ao processar documento {ext}: {e}", config.nome)
+                # Tenta fechar qualquer preview aberto
+                try:
+                    await fechar_preview(browser)
+                except Exception:
+                    pass
 
         frame = await recuperar_frame_tarefa(browser, frame, nome_tarefa)
 
