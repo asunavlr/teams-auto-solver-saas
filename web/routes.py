@@ -280,3 +280,61 @@ def logs():
         page=page,
         total_pages=total_pages,
     )
+
+
+# ============================================
+# WEBHOOK PARA AUTO-DEPLOY
+# ============================================
+
+@main_bp.route("/webhook/deploy", methods=["POST"])
+def webhook_deploy():
+    """Webhook do GitHub para auto-deploy."""
+    import hashlib
+    import hmac
+    import subprocess
+    import os
+    from loguru import logger
+
+    # Segredo para validar webhook (configure no .env e no GitHub)
+    webhook_secret = os.getenv("WEBHOOK_SECRET", "")
+
+    if webhook_secret:
+        # Valida assinatura do GitHub
+        signature = request.headers.get("X-Hub-Signature-256", "")
+        if signature:
+            expected = "sha256=" + hmac.new(
+                webhook_secret.encode(),
+                request.data,
+                hashlib.sha256
+            ).hexdigest()
+
+            if not hmac.compare_digest(signature, expected):
+                logger.warning("Webhook: assinatura invalida!")
+                return {"error": "Invalid signature"}, 403
+
+    # Verifica se é push na branch main
+    data = request.json or {}
+    ref = data.get("ref", "")
+    if ref != "refs/heads/main":
+        return {"status": "ignored", "reason": "not main branch"}, 200
+
+    logger.info("Webhook: iniciando deploy...")
+
+    try:
+        # Executa deploy em background
+        project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        deploy_script = f"""
+cd {project_dir}
+git pull origin main
+pkill -f "python app.py" || true
+sleep 2
+source venv/bin/activate
+nohup python app.py > logs/server.log 2>&1 &
+"""
+        subprocess.Popen(["bash", "-c", deploy_script], start_new_session=True)
+        logger.info("Webhook: deploy iniciado com sucesso!")
+        return {"status": "deploying"}, 200
+
+    except Exception as e:
+        logger.error(f"Webhook: erro no deploy: {e}")
+        return {"error": str(e)}, 500
