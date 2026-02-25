@@ -423,6 +423,19 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
     formato = detectar_formato_resposta(content)
     tarefa_info["formato"] = formato
 
+    # Verifica se é atividade em grupo (no nome OU nas instruções)
+    texto_verificar = (nome_tarefa + " " + tarefa_info["instrucoes"]).lower()
+    frases_grupo = [
+        "atividade em grupo", "trabalho em grupo", "em equipe",
+        "atividade em dupla", "trabalho em dupla", "em trio",
+        "grupo de ate", "grupo de até", "equipe de ate", "equipe de até",
+        "formar grupo", "formar equipe", "formem grupo", "formem equipe"
+    ]
+    if any(frase in texto_verificar for frase in frases_grupo):
+        log(f"  Atividade em GRUPO detectada nas instrucoes, pulando!", config.nome)
+        await fechar_preview(browser)
+        return "grupo"
+
     # Screenshot da tarefa
     screenshot_path = data_dir / "tarefa_nova.png"
     await browser.page.screenshot(path=str(screenshot_path))
