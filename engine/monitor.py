@@ -450,9 +450,31 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
             if ext not in content_lower:
                 continue
             try:
-                doc_link = frame.locator(f'text=/{re.escape(ext)}/i').first
-                async with browser.page.expect_download(timeout=15000) as download_info:
-                    await doc_link.click()
+                # Tenta encontrar o elemento clicavel (botao/link) que contem o texto do arquivo
+                doc_link = None
+
+                # Primeiro tenta botao ou link que contenha a extensao
+                for selector in [
+                    f'button:has-text("{ext}")',
+                    f'a:has-text("{ext}")',
+                    f'[role="button"]:has-text("{ext}")',
+                    f'div[tabindex]:has-text("{ext}")',
+                    f'[data-is-focusable="true"]:has-text("{ext}")',
+                ]:
+                    try:
+                        loc = frame.locator(selector).first
+                        if await loc.count() > 0 and await loc.is_visible(timeout=2000):
+                            doc_link = loc
+                            break
+                    except Exception:
+                        continue
+
+                # Fallback: encontra o texto e tenta clicar
+                if not doc_link:
+                    doc_link = frame.locator(f'text=/{re.escape(ext)}/i').first
+
+                async with browser.page.expect_download(timeout=30000) as download_info:
+                    await doc_link.click(timeout=10000)
                 download = await download_info.value
                 download_path = str(data_dir / download.suggested_filename)
                 await download.save_as(download_path)
