@@ -136,11 +136,17 @@ async def verificar_activity(browser, data_dir: Path, client_name: str = "", max
                         atividade["data"] = next_line
 
                 if atividade.get("nome"):
-                    atividade["id"] = hashlib.md5(
-                        (atividade["nome"] + atividade.get("disciplina", "")).encode()
-                    ).hexdigest()
+                    # Cria ID unico com nome + disciplina + prazo para evitar duplicatas
+                    id_string = (
+                        atividade["nome"] +
+                        atividade.get("disciplina", "") +
+                        atividade.get("prazo", "") +
+                        atividade.get("data", "")
+                    )
+                    atividade["id"] = hashlib.md5(id_string.encode()).hexdigest()
                     atividades.append(atividade)
-                    log(f"  Encontrada: {atividade['nome']}", client_name)
+                    disciplina = atividade.get('disciplina', 'sem disciplina')
+                    log(f"  Encontrada: {atividade['nome']} | {disciplina}", client_name)
 
                 i += 4
             else:
