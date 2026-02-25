@@ -234,12 +234,16 @@ def init_scheduler(app):
         logger.info("Scheduler ja esta rodando")
         return
 
+    clients_to_run_now = []
+
     with app.app_context():
         from web.models import Client
         from web import db
 
         active_clients = Client.query.filter_by(status="active").all()
         active_clients = [c for c in active_clients if c.is_active]
+
+        now = datetime.utcnow()
 
         for client in active_clients:
             job_id = f"client_{client.id}"
@@ -252,16 +256,39 @@ def init_scheduler(app):
                 replace_existing=True,
                 max_instances=1,
             )
-            logger.info(f"Job carregado: {client.nome} (cada {client.check_interval} min)")
+
+            # Verifica se precisa rodar imediatamente
+            # (nunca rodou OU perdeu ciclo durante downtime)
+            needs_immediate_run = False
+            if client.last_check is None:
+                needs_immediate_run = True
+                reason = "nunca executado"
+            else:
+                # Calcula quando deveria ter rodado
+                from datetime import timedelta
+                next_expected = client.last_check + timedelta(minutes=client.check_interval)
+                if next_expected < now:
+                    needs_immediate_run = True
+                    minutes_late = int((now - next_expected).total_seconds() / 60)
+                    reason = f"atrasado {minutes_late} min"
+                else:
+                    minutes_until = int((next_expected - now).total_seconds() / 60)
+                    reason = f"proximo em {minutes_until} min"
+
+            if needs_immediate_run:
+                clients_to_run_now.append(client.id)
+                logger.info(f"Job carregado: {client.nome} ({reason}) - EXECUTAR AGORA")
+            else:
+                logger.info(f"Job carregado: {client.nome} ({reason})")
 
     scheduler.start()
     logger.info(f"Scheduler iniciado com {len(active_clients)} cliente(s) ativo(s)")
 
-    # Executa todos os clientes imediatamente na inicializacao
-    # para garantir que nao perderam ciclos durante downtime
-    for client in active_clients:
-        _pending_queue.put(client.id)
-
-    if active_clients:
+    # Executa apenas clientes que perderam ciclos
+    if clients_to_run_now:
+        for client_id in clients_to_run_now:
+            _pending_queue.put(client_id)
         _ensure_queue_processor()
-        logger.info(f"Execucao inicial agendada para {len(active_clients)} cliente(s)")
+        logger.info(f"Execucao imediata para {len(clients_to_run_now)} cliente(s) que perderam ciclos")
+    else:
+        logger.info("Nenhum cliente perdeu ciclos, aguardando intervalos normais")
