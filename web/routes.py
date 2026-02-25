@@ -1,18 +1,32 @@
 """Rotas do painel web."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
+
 from flask import Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import login_required
+
+import config as cfg
 from web import db
 from web.models import Client, TaskLog, Payment
 
 main_bp = Blueprint("main", __name__)
 
 
+def get_today_start():
+    """Retorna inicio do dia no fuso horario local."""
+    try:
+        tz = ZoneInfo(cfg.TIMEZONE)
+        now = datetime.now(tz)
+    except Exception:
+        now = datetime.now(timezone(timedelta(hours=-3)))
+    return now.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+
+
 @main_bp.route("/")
 @login_required
 def dashboard():
-    now = datetime.utcnow()
+    today_start = get_today_start()
     all_clients = Client.query.all()
 
     stats = {
@@ -20,7 +34,7 @@ def dashboard():
         "active_clients": sum(1 for c in all_clients if c.is_active),
         "expired_clients": sum(1 for c in all_clients if c.is_expired),
         "tasks_today": TaskLog.query.filter(
-            TaskLog.created_at >= now.replace(hour=0, minute=0, second=0)
+            TaskLog.created_at >= today_start
         ).count(),
     }
 

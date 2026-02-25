@@ -2,12 +2,14 @@
 
 import os
 from collections import deque
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from flask import Blueprint, jsonify, request
 from flask_login import login_required
 
+import config as cfg
 from web import db
 from web.models import Client, TaskLog, ClientStatus
 
@@ -17,11 +19,30 @@ api_bp = Blueprint("api", __name__, url_prefix="/api")
 _log_positions = {}
 
 
+def get_local_now():
+    """Retorna datetime atual no fuso horario configurado."""
+    try:
+        tz = ZoneInfo(cfg.TIMEZONE)
+        return datetime.now(tz)
+    except Exception:
+        # Fallback para UTC-3 (Brasilia)
+        return datetime.now(timezone(timedelta(hours=-3)))
+
+
+def get_today_start():
+    """Retorna inicio do dia no fuso horario local."""
+    now = get_local_now()
+    return now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
 @api_bp.route("/dashboard/stats")
 @login_required
 def dashboard_stats():
     """Retorna estatisticas do dashboard."""
-    now = datetime.utcnow()
+    today_start = get_today_start()
+    # Remove timezone para comparar com datetime naive do banco
+    today_start_naive = today_start.replace(tzinfo=None)
+
     all_clients = Client.query.all()
 
     stats = {
@@ -29,10 +50,10 @@ def dashboard_stats():
         "active_clients": sum(1 for c in all_clients if c.is_active),
         "expired_clients": sum(1 for c in all_clients if c.is_expired),
         "tasks_today": TaskLog.query.filter(
-            TaskLog.created_at >= now.replace(hour=0, minute=0, second=0)
+            TaskLog.created_at >= today_start_naive
         ).count(),
         "tasks_week": TaskLog.query.filter(
-            TaskLog.created_at >= now - timedelta(days=7)
+            TaskLog.created_at >= today_start_naive - timedelta(days=7)
         ).count(),
     }
 

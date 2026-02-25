@@ -32,3 +32,6 @@ DEFAULT_CHECK_INTERVAL = int(os.getenv("DEFAULT_CHECK_INTERVAL", "60"))
 # Logs
 LOG_DIR = BASE_DIR / "logs"
 LOG_DIR.mkdir(exist_ok=True)
+
+# Timezone (padrao: America/Sao_Paulo)
+TIMEZONE = os.getenv("TIMEZONE", "America/Sao_Paulo")
