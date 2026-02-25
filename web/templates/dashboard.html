@@ -3,60 +3,78 @@
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h4 class="fw-bold m-0">Dashboard</h4>
-    <small class="text-muted" id="last-update">Atualizado agora</small>
+    <div>
+        <h4 class="fw-bold m-0">Dashboard</h4>
+        <small class="text-muted">Visao geral do sistema</small>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-light text-dark border" id="last-update">
+            <i class="bi bi-clock"></i> Atualizado agora
+        </span>
+        <span class="badge bg-primary" id="refresh-indicator">
+            <i class="bi bi-arrow-repeat spin-slow"></i> Live
+        </span>
+    </div>
 </div>
 
 <!-- Stats Cards -->
 <div class="row g-3 mb-4">
-    <div class="col-sm-6 col-lg-3">
-        <div class="card stat-card p-3">
-            <div class="d-flex align-items-center">
-                <div class="rounded-circle bg-primary bg-opacity-10 p-3 me-3">
-                    <i class="bi bi-people-fill fs-4 text-primary"></i>
-                </div>
-                <div>
-                    <div class="fs-4 fw-bold" id="stat-total">{{ stats.total_clients }}</div>
-                    <small class="text-muted">Total Clientes</small>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-lg-3">
-        <div class="card stat-card p-3">
-            <div class="d-flex align-items-center">
-                <div class="rounded-circle bg-success bg-opacity-10 p-3 me-3">
-                    <i class="bi bi-check-circle-fill fs-4 text-success"></i>
-                </div>
-                <div>
-                    <div class="fs-4 fw-bold" id="stat-active">{{ stats.active_clients }}</div>
-                    <small class="text-muted">Ativos</small>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="icon-box bg-primary-subtle text-primary me-3">
+                        <i class="bi bi-people-fill"></i>
+                    </div>
+                    <div>
+                        <div class="fs-3 fw-bold" id="stat-total">{{ stats.total_clients }}</div>
+                        <small class="text-muted">Total Clientes</small>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-sm-6 col-lg-3">
-        <div class="card stat-card p-3">
-            <div class="d-flex align-items-center">
-                <div class="rounded-circle bg-danger bg-opacity-10 p-3 me-3">
-                    <i class="bi bi-x-circle-fill fs-4 text-danger"></i>
-                </div>
-                <div>
-                    <div class="fs-4 fw-bold" id="stat-expired">{{ stats.expired_clients }}</div>
-                    <small class="text-muted">Expirados</small>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="icon-box bg-success-subtle text-success me-3">
+                        <i class="bi bi-check-circle-fill"></i>
+                    </div>
+                    <div>
+                        <div class="fs-3 fw-bold" id="stat-active">{{ stats.active_clients }}</div>
+                        <small class="text-muted">Ativos</small>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-sm-6 col-lg-3">
-        <div class="card stat-card p-3">
-            <div class="d-flex align-items-center">
-                <div class="rounded-circle bg-info bg-opacity-10 p-3 me-3">
-                    <i class="bi bi-journal-check fs-4 text-info"></i>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="icon-box bg-danger-subtle text-danger me-3">
+                        <i class="bi bi-x-circle-fill"></i>
+                    </div>
+                    <div>
+                        <div class="fs-3 fw-bold" id="stat-expired">{{ stats.expired_clients }}</div>
+                        <small class="text-muted">Expirados</small>
+                    </div>
                 </div>
-                <div>
-                    <div class="fs-4 fw-bold" id="stat-tasks">{{ stats.tasks_today }}</div>
-                    <small class="text-muted">Tarefas Hoje</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="icon-box bg-info-subtle text-info me-3">
+                        <i class="bi bi-journal-check"></i>
+                    </div>
+                    <div>
+                        <div class="fs-3 fw-bold" id="stat-tasks">{{ stats.tasks_today }}</div>
+                        <small class="text-muted">Tarefas Hoje</small>
+                    </div>
                 </div>
             </div>
         </div>
@@ -65,69 +83,76 @@
 
 <!-- Alerts -->
 {% if expiring_clients %}
-<div class="alert alert-warning d-flex align-items-center mb-4">
-    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+<div class="alert alert-warning border-0 shadow-sm d-flex align-items-center mb-4">
+    <div class="alert-icon me-3">
+        <i class="bi bi-exclamation-triangle-fill fs-4"></i>
+    </div>
     <div>
         <strong>{{ expiring_clients|length }} cliente(s)</strong> com assinatura vencendo em 7 dias:
         {% for c in expiring_clients %}
-            <a href="{{ url_for('main.client_detail', client_id=c.id) }}" class="alert-link">{{ c.nome }}</a>{% if not loop.last %}, {% endif %}
+            <a href="{{ url_for('main.client_detail', client_id=c.id) }}" class="alert-link fw-semibold">{{ c.nome }}</a>{% if not loop.last %}, {% endif %}
         {% endfor %}
     </div>
 </div>
 {% endif %}
 
 <!-- Client Status Monitor -->
-<div class="row g-3 mb-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header bg-white border-0 pt-3 d-flex justify-content-between align-items-center">
-                <h6 class="fw-bold m-0"><i class="bi bi-activity"></i> Status em Tempo Real</h6>
-                <span class="badge bg-secondary" id="refresh-indicator">
-                    <i class="bi bi-arrow-repeat"></i> Auto-refresh: 10s
-                </span>
+<div class="card mb-4">
+    <div class="card-header bg-white py-3">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h6 class="fw-bold m-0"><i class="bi bi-activity text-primary"></i> Status em Tempo Real</h6>
+                <small class="text-muted">Monitoramento de todos os clientes</small>
             </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0" id="status-table">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Cliente</th>
-                                <th>Assinatura</th>
-                                <th>Status</th>
-                                <th>Acao Atual</th>
-                                <th>Ultima Verificacao</th>
-                                <th>Tarefas</th>
-                            </tr>
-                        </thead>
-                        <tbody id="clients-status-body">
-                            <!-- Preenchido via JavaScript -->
-                            <tr>
-                                <td colspan="6" class="text-center text-muted py-4">
-                                    <i class="bi bi-arrow-repeat spin"></i> Carregando...
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr class="bg-light">
+                        <th class="ps-4">Cliente</th>
+                        <th>Assinatura</th>
+                        <th>Status</th>
+                        <th>Acao Atual</th>
+                        <th>Ultima Verificacao</th>
+                        <th class="text-center">Tarefas</th>
+                    </tr>
+                </thead>
+                <tbody id="clients-status-body">
+                    <tr>
+                        <td colspan="6" class="text-center py-5">
+                            <div class="spinner-border spinner-border-sm text-primary me-2"></div>
+                            Carregando clientes...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
 
 <!-- Recent Tasks & Clients -->
-<div class="row g-3">
-    <div class="col-lg-7">
-        <div class="card">
-            <div class="card-header bg-white border-0 pt-3 d-flex justify-content-between align-items-center">
-                <h6 class="fw-bold m-0"><i class="bi bi-clock-history"></i> Ultimas Tarefas</h6>
-                <a href="{{ url_for('main.logs') }}" class="btn btn-sm btn-outline-secondary">Ver todos</a>
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card h-100">
+            <div class="card-header bg-white py-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="fw-bold m-0"><i class="bi bi-clock-history text-primary"></i> Ultimas Tarefas</h6>
+                        <small class="text-muted">Atividades processadas recentemente</small>
+                    </div>
+                    <a href="{{ url_for('main.logs') }}" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-list"></i> Ver todas
+                    </a>
+                </div>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Cliente</th>
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr class="bg-light">
+                                <th class="ps-4">Cliente</th>
                                 <th>Tarefa</th>
                                 <th>Formato</th>
                                 <th>Status</th>
@@ -137,20 +162,60 @@
                         <tbody id="recent-tasks-body">
                             {% for log in recent_tasks %}
                             <tr>
-                                <td>{{ log.client.nome }}</td>
-                                <td class="text-truncate" style="max-width: 200px;">{{ log.task_name }}</td>
-                                <td><span class="badge bg-secondary">{{ log.format or '-' }}</span></td>
+                                <td class="ps-4">
+                                    <span class="fw-medium">{{ log.client.nome }}</span>
+                                </td>
                                 <td>
-                                    {% if log.status == 'success' %}
-                                        <span class="badge bg-success">OK</span>
-                                    {% else %}
-                                        <span class="badge bg-danger">Erro</span>
+                                    <div class="text-truncate" style="max-width: 250px;" title="{{ log.task_name }}">
+                                        {{ log.task_name }}
+                                    </div>
+                                    {% if log.discipline %}
+                                    <small class="text-muted">{{ log.discipline[:30] }}</small>
                                     {% endif %}
                                 </td>
-                                <td><small class="text-muted">{{ log.created_at.strftime('%d/%m %H:%M') }}</small></td>
+                                <td>
+                                    {% if log.format %}
+                                        {% if log.format == 'docx' %}
+                                            <span class="badge bg-primary-subtle text-primary"><i class="bi bi-file-earmark-word"></i> DOCX</span>
+                                        {% elif log.format == 'pdf' %}
+                                            <span class="badge bg-danger-subtle text-danger"><i class="bi bi-file-earmark-pdf"></i> PDF</span>
+                                        {% elif log.format == 'texto' %}
+                                            <span class="badge bg-secondary-subtle text-secondary"><i class="bi bi-file-earmark-text"></i> Texto</span>
+                                        {% elif log.format in ['py', 'js', 'html', 'css', 'java', 'cpp', 'c'] %}
+                                            <span class="badge bg-success-subtle text-success"><i class="bi bi-file-earmark-code"></i> {{ log.format|upper }}</span>
+                                        {% elif log.format == 'zip' %}
+                                            <span class="badge bg-warning-subtle text-warning"><i class="bi bi-file-earmark-zip"></i> ZIP</span>
+                                        {% else %}
+                                            <span class="badge bg-light text-dark border">{{ log.format|upper }}</span>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if log.status == 'success' %}
+                                        <span class="badge bg-success"><i class="bi bi-check-lg"></i> Enviado</span>
+                                    {% elif log.status == 'not_found' %}
+                                        <span class="badge bg-secondary"><i class="bi bi-search"></i> Nao encontrado</span>
+                                    {% elif log.status == 'group' %}
+                                        <span class="badge bg-info"><i class="bi bi-people"></i> Grupo</span>
+                                    {% elif log.status == 'skipped' %}
+                                        <span class="badge bg-warning text-dark"><i class="bi bi-skip-forward"></i> Pulado</span>
+                                    {% else %}
+                                        <span class="badge bg-danger"><i class="bi bi-x-lg"></i> Erro</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small class="text-muted">{{ log.created_at.strftime('%d/%m %H:%M') }}</small>
+                                </td>
                             </tr>
                             {% else %}
-                            <tr><td colspan="5" class="text-center text-muted py-4">Nenhuma tarefa ainda</td></tr>
+                            <tr>
+                                <td colspan="5" class="text-center py-5 text-muted">
+                                    <i class="bi bi-inbox fs-1 d-block mb-2 opacity-50"></i>
+                                    Nenhuma tarefa processada ainda
+                                </td>
+                            </tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -159,35 +224,47 @@
         </div>
     </div>
 
-    <div class="col-lg-5">
-        <div class="card">
-            <div class="card-header bg-white border-0 pt-3 d-flex justify-content-between">
-                <h6 class="fw-bold m-0"><i class="bi bi-people"></i> Clientes Recentes</h6>
-                <a href="{{ url_for('main.client_add') }}" class="btn btn-sm btn-primary">
-                    <i class="bi bi-plus"></i> Novo
-                </a>
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header bg-white py-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="fw-bold m-0"><i class="bi bi-person-plus text-primary"></i> Clientes Recentes</h6>
+                        <small class="text-muted">Ultimos cadastros</small>
+                    </div>
+                    <a href="{{ url_for('main.client_add') }}" class="btn btn-sm btn-primary">
+                        <i class="bi bi-plus-lg"></i>
+                    </a>
+                </div>
             </div>
             <div class="card-body p-0">
                 <div class="list-group list-group-flush">
                     {% for client in recent_clients %}
-                    <a href="{{ url_for('main.client_detail', client_id=client.id) }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                        <div>
-                            <div class="fw-semibold">{{ client.nome }}</div>
-                            <small class="text-muted">{{ client.teams_email }}</small>
-                        </div>
-                        <div class="text-end">
-                            {% if client.is_active %}
-                                <span class="badge badge-active">Ativo</span>
-                            {% elif client.status == 'paused' %}
-                                <span class="badge badge-paused">Pausado</span>
-                            {% else %}
-                                <span class="badge badge-expired">Expirado</span>
-                            {% endif %}
-                            <br><small class="text-muted">{{ client.tasks_completed }} tarefas</small>
+                    <a href="{{ url_for('main.client_detail', client_id=client.id) }}" class="list-group-item list-group-item-action py-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="fw-semibold">{{ client.nome }}</div>
+                                <small class="text-muted">{{ client.teams_email[:25] }}...</small>
+                            </div>
+                            <div class="text-end">
+                                {% if client.is_active %}
+                                    <span class="badge bg-success-subtle text-success">Ativo</span>
+                                {% elif client.status == 'paused' %}
+                                    <span class="badge bg-warning-subtle text-warning">Pausado</span>
+                                {% else %}
+                                    <span class="badge bg-danger-subtle text-danger">Expirado</span>
+                                {% endif %}
+                                <div class="mt-1">
+                                    <small class="text-muted"><i class="bi bi-check2-all"></i> {{ client.tasks_completed }}</small>
+                                </div>
+                            </div>
                         </div>
                     </a>
                     {% else %}
-                    <div class="text-center text-muted py-4">Nenhum cliente ainda</div>
+                    <div class="text-center py-5 text-muted">
+                        <i class="bi bi-person-plus fs-1 d-block mb-2 opacity-50"></i>
+                        Nenhum cliente cadastrado
+                    </div>
                     {% endfor %}
                 </div>
             </div>
@@ -198,30 +275,69 @@
 
 {% block scripts %}
 <style>
-.spin {
-    animation: spin 1s linear infinite;
+.icon-box {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+}
+.spin-slow {
+    animation: spin 2s linear infinite;
 }
 @keyframes spin {
     100% { transform: rotate(360deg); }
 }
 .status-running {
-    background-color: #dbeafe;
+    background: linear-gradient(90deg, #dbeafe 0%, #eff6ff 100%);
+    border-left: 3px solid #3b82f6;
 }
 .status-error {
-    background-color: #fee2e2;
+    background: linear-gradient(90deg, #fee2e2 0%, #fef2f2 100%);
+    border-left: 3px solid #ef4444;
 }
 .pulse {
-    animation: pulse 2s infinite;
+    animation: pulse 2s ease-in-out infinite;
 }
 @keyframes pulse {
-    0% { opacity: 1; }
-    50% { opacity: 0.5; }
-    100% { opacity: 1; }
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
 }
+.table th {
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #6b7280;
+    border-bottom: none;
+}
+.table td {
+    vertical-align: middle;
+    border-color: #f3f4f6;
+}
+.card {
+    border: 1px solid #e5e7eb;
+}
+.card-header {
+    border-bottom: 1px solid #f3f4f6;
+}
+.bg-primary-subtle { background-color: #eff6ff; }
+.bg-success-subtle { background-color: #f0fdf4; }
+.bg-danger-subtle { background-color: #fef2f2; }
+.bg-warning-subtle { background-color: #fffbeb; }
+.bg-info-subtle { background-color: #f0f9ff; }
+.bg-secondary-subtle { background-color: #f9fafb; }
+.text-primary { color: #3b82f6 !important; }
+.text-success { color: #22c55e !important; }
+.text-danger { color: #ef4444 !important; }
+.text-warning { color: #f59e0b !important; }
+.text-info { color: #0ea5e9 !important; }
 </style>
 
 <script>
-const REFRESH_INTERVAL = 10000; // 10 segundos
+const REFRESH_INTERVAL = 10000;
 let lastLogTimestamp = null;
 
 function formatDate(isoString) {
@@ -235,22 +351,48 @@ function formatDate(isoString) {
     });
 }
 
-function getStatusBadge(status) {
+function getSubscriptionBadge(status) {
     const badges = {
-        'active': '<span class="badge badge-active">Ativo</span>',
-        'paused': '<span class="badge badge-paused">Pausado</span>',
-        'expired': '<span class="badge badge-expired">Expirado</span>',
+        'active': '<span class="badge bg-success-subtle text-success">Ativo</span>',
+        'paused': '<span class="badge bg-warning-subtle text-warning">Pausado</span>',
+        'expired': '<span class="badge bg-danger-subtle text-danger">Expirado</span>',
     };
     return badges[status] || '<span class="badge bg-secondary">-</span>';
 }
 
 function getRuntimeBadge(status) {
     const badges = {
-        'idle': '<span class="badge bg-secondary"><i class="bi bi-pause-circle"></i> Idle</span>',
-        'running': '<span class="badge bg-primary pulse"><i class="bi bi-play-circle"></i> Executando</span>',
-        'error': '<span class="badge bg-danger"><i class="bi bi-exclamation-circle"></i> Erro</span>',
+        'idle': '<span class="badge bg-secondary-subtle text-secondary"><i class="bi bi-pause-circle"></i> Aguardando</span>',
+        'running': '<span class="badge bg-primary pulse"><i class="bi bi-play-circle-fill"></i> Executando</span>',
+        'error': '<span class="badge bg-danger"><i class="bi bi-exclamation-triangle"></i> Erro</span>',
     };
     return badges[status] || '<span class="badge bg-secondary">-</span>';
+}
+
+function getTaskStatusBadge(status) {
+    const badges = {
+        'success': '<span class="badge bg-success"><i class="bi bi-check-lg"></i> Enviado</span>',
+        'not_found': '<span class="badge bg-secondary"><i class="bi bi-search"></i> Nao encontrado</span>',
+        'group': '<span class="badge bg-info"><i class="bi bi-people"></i> Grupo</span>',
+        'skipped': '<span class="badge bg-warning text-dark"><i class="bi bi-skip-forward"></i> Pulado</span>',
+        'error': '<span class="badge bg-danger"><i class="bi bi-x-lg"></i> Erro</span>',
+    };
+    return badges[status] || '<span class="badge bg-secondary">-</span>';
+}
+
+function getFormatBadge(format) {
+    if (!format) return '<span class="text-muted">-</span>';
+
+    const formats = {
+        'docx': '<span class="badge bg-primary-subtle text-primary"><i class="bi bi-file-earmark-word"></i> DOCX</span>',
+        'pdf': '<span class="badge bg-danger-subtle text-danger"><i class="bi bi-file-earmark-pdf"></i> PDF</span>',
+        'texto': '<span class="badge bg-secondary-subtle text-secondary"><i class="bi bi-file-earmark-text"></i> Texto</span>',
+        'py': '<span class="badge bg-success-subtle text-success"><i class="bi bi-file-earmark-code"></i> PY</span>',
+        'js': '<span class="badge bg-success-subtle text-success"><i class="bi bi-file-earmark-code"></i> JS</span>',
+        'html': '<span class="badge bg-success-subtle text-success"><i class="bi bi-file-earmark-code"></i> HTML</span>',
+        'zip': '<span class="badge bg-warning-subtle text-warning"><i class="bi bi-file-earmark-zip"></i> ZIP</span>',
+    };
+    return formats[format.toLowerCase()] || `<span class="badge bg-light text-dark border">${format.toUpperCase()}</span>`;
 }
 
 async function updateClientsStatus() {
@@ -260,7 +402,13 @@ async function updateClientsStatus() {
 
         const tbody = document.getElementById('clients-status-body');
         if (clients.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">Nenhum cliente cadastrado</td></tr>';
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center py-5 text-muted">
+                        <i class="bi bi-person-plus fs-1 d-block mb-2 opacity-50"></i>
+                        Nenhum cliente cadastrado
+                    </td>
+                </tr>`;
             return;
         }
 
@@ -270,19 +418,23 @@ async function updateClientsStatus() {
 
             return `
                 <tr class="${rowClass}">
-                    <td>
-                        <a href="/clients/${client.id}" class="fw-semibold text-decoration-none">${client.nome}</a>
-                        ${client.days_remaining <= 7 ? '<i class="bi bi-exclamation-triangle text-warning ms-1" title="Vence em ' + client.days_remaining + ' dias"></i>' : ''}
+                    <td class="ps-4">
+                        <a href="/clients/${client.id}" class="fw-semibold text-decoration-none text-dark">
+                            ${client.nome}
+                        </a>
+                        ${client.days_remaining <= 7 && client.days_remaining > 0 ?
+                            `<span class="badge bg-warning-subtle text-warning ms-2"><i class="bi bi-clock"></i> ${client.days_remaining}d</span>` : ''}
                     </td>
-                    <td>${getStatusBadge(client.subscription_status)}</td>
+                    <td>${getSubscriptionBadge(client.subscription_status)}</td>
                     <td>${getRuntimeBadge(client.current_status)}</td>
-                    <td class="text-truncate" style="max-width: 200px;">
-                        ${client.current_action || '<span class="text-muted">-</span>'}
+                    <td>
+                        <div class="text-truncate" style="max-width: 200px;">
+                            ${client.current_action || '<span class="text-muted">-</span>'}
+                        </div>
                     </td>
                     <td><small class="text-muted">${formatDate(client.last_check)}</small></td>
-                    <td>
-                        <span class="badge bg-info">${client.tasks_completed}</span>
-                        ${client.last_task ? '<br><small class="text-muted">' + client.last_task.name.substring(0, 20) + '...</small>' : ''}
+                    <td class="text-center">
+                        <span class="badge bg-info-subtle text-info fs-6">${client.tasks_completed}</span>
                     </td>
                 </tr>
             `;
@@ -318,34 +470,39 @@ async function updateRecentLogs() {
         const response = await fetch(url);
         const logs = await response.json();
 
-        if (logs.length > 0) {
+        if (logs.length > 0 && lastLogTimestamp) {
             lastLogTimestamp = logs[0].created_at;
 
             const tbody = document.getElementById('recent-tasks-body');
-            const existingRows = tbody.innerHTML;
 
             const newRows = logs.map(log => `
-                <tr class="table-success" style="animation: fadeIn 0.5s;">
-                    <td>${log.client_name}</td>
-                    <td class="text-truncate" style="max-width: 200px;">${log.task_name}</td>
-                    <td><span class="badge bg-secondary">${log.format || '-'}</span></td>
+                <tr style="animation: fadeIn 0.5s; background-color: #f0fdf4;">
+                    <td class="ps-4"><span class="fw-medium">${log.client_name}</span></td>
                     <td>
-                        ${log.status === 'success' ?
-                            '<span class="badge bg-success">OK</span>' :
-                            '<span class="badge bg-danger">Erro</span>'}
+                        <div class="text-truncate" style="max-width: 250px;" title="${log.task_name}">
+                            ${log.task_name}
+                        </div>
+                        ${log.discipline ? `<small class="text-muted">${log.discipline.substring(0, 30)}</small>` : ''}
                     </td>
+                    <td>${getFormatBadge(log.format)}</td>
+                    <td>${getTaskStatusBadge(log.status)}</td>
                     <td><small class="text-muted">${formatDate(log.created_at)}</small></td>
                 </tr>
             `).join('');
 
-            // Adiciona novos logs no topo
             if (newRows) {
-                tbody.innerHTML = newRows + existingRows;
-                // Limita a 10 linhas
-                while (tbody.children.length > 10) {
-                    tbody.removeChild(tbody.lastChild);
+                const firstRow = tbody.querySelector('tr');
+                if (firstRow && firstRow.textContent.includes('Nenhuma tarefa')) {
+                    tbody.innerHTML = newRows;
+                } else {
+                    tbody.insertAdjacentHTML('afterbegin', newRows);
+                    while (tbody.children.length > 10) {
+                        tbody.removeChild(tbody.lastChild);
+                    }
                 }
             }
+        } else if (logs.length > 0 && !lastLogTimestamp) {
+            lastLogTimestamp = logs[0].created_at;
         }
 
     } catch (error) {
@@ -355,7 +512,7 @@ async function updateRecentLogs() {
 
 function updateTimestamp() {
     const now = new Date();
-    document.getElementById('last-update').textContent = 'Atualizado ' + now.toLocaleTimeString('pt-BR');
+    document.getElementById('last-update').innerHTML = `<i class="bi bi-clock"></i> ${now.toLocaleTimeString('pt-BR')}`;
 }
 
 async function refreshAll() {
@@ -367,10 +524,16 @@ async function refreshAll() {
     updateTimestamp();
 }
 
-// Inicializa
 document.addEventListener('DOMContentLoaded', () => {
     refreshAll();
     setInterval(refreshAll, REFRESH_INTERVAL);
 });
 </script>
+
+<style>
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+</style>
 {% endblock %}

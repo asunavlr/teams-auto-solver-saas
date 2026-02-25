@@ -317,16 +317,25 @@ async def recuperar_frame_tarefa(browser, frame, nome_tarefa, disciplina=""):
     return frame
 
 
-async def processar_nova_atividade(browser, atividade: dict, config: ClientConfig) -> str | bool:
-    """Processa uma nova atividade para um cliente."""
+async def processar_nova_atividade(browser, atividade: dict, config: ClientConfig) -> dict:
+    """Processa uma nova atividade para um cliente.
+
+    Retorna dict com:
+        - status: 'success', 'skipped', 'not_found', 'group', 'error'
+        - format: formato do arquivo (docx, pdf, etc)
+        - error: mensagem de erro se houver
+    """
     nome_tarefa = atividade.get("nome", "")
     disciplina = atividade.get("disciplina", "")
     data_dir = config.data_dir
+    resultado = {"status": "error", "format": "", "error": ""}
 
     log(f"Processando: {nome_tarefa} | {disciplina}", config.nome)
 
     if atividade.get("tipo") != "assignment":
-        return False
+        resultado["status"] = "skipped"
+        resultado["error"] = "Tipo nao suportado"
+        return resultado
 
     # Detecta atividades OBRIGATORIAMENTE em grupo (pula automaticamente)
     # Só pula se tiver "em grupo", "em equipe", etc. - ignora "pode ser em dupla"
@@ -337,7 +346,8 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
     ]
     if any(frase in nome_lower for frase in frases_grupo_obrigatorio):
         log(f"  Atividade em GRUPO detectada, pulando: {nome_tarefa}", config.nome)
-        return "grupo"
+        resultado["status"] = "group"
+        return resultado
 
     # Clica em Atribuicoes
     try:
@@ -393,7 +403,8 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
 
     if not tarefa_encontrada:
         log(f"Tarefa nao encontrada: {nome_tarefa} (marcando como processada)", config.nome)
-        return "nao_encontrada"
+        resultado["status"] = "not_found"
+        return resultado
 
     # Atualiza frame
     for f in browser.page.frames:
@@ -434,7 +445,8 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
     if any(frase in texto_verificar for frase in frases_grupo):
         log(f"  Atividade em GRUPO detectada nas instrucoes, pulando!", config.nome)
         await fechar_preview(browser)
-        return "grupo"
+        resultado["status"] = "group"
+        return resultado
 
     # Screenshot da tarefa
     screenshot_path = data_dir / "tarefa_nova.png"
@@ -608,7 +620,10 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
 
     if not resposta:
         log("Falha ao resolver", config.nome)
-        return False
+        resultado["status"] = "error"
+        resultado["format"] = formato
+        resultado["error"] = "Claude nao retornou resposta"
+        return resultado
 
     # Detecta formato
     formato_detectado = detectar_formato_da_resposta(resposta)
@@ -660,7 +675,10 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
                 text_area = frame.locator('textarea, [contenteditable="true"]').first
                 await text_area.fill(resposta[:5000])
             except Exception:
-                return False
+                resultado["status"] = "error"
+                resultado["format"] = formato
+                resultado["error"] = "Falha ao anexar arquivo"
+                return resultado
     else:
         try:
             text_area = frame.locator('textarea, [contenteditable="true"]').first
@@ -671,7 +689,10 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
                 await file_input.set_input_files(arquivos)
                 await asyncio.sleep(2)
             except Exception:
-                return False
+                resultado["status"] = "error"
+                resultado["format"] = formato
+                resultado["error"] = "Falha ao preencher texto"
+                return resultado
 
     # Submit
     try:
@@ -726,11 +747,16 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
                 await asyncio.sleep(1)
 
         await asyncio.sleep(3)
-        return True
+        resultado["status"] = "success"
+        resultado["format"] = formato
+        return resultado
 
     except Exception as e:
         log(f"Erro ao enviar: {e}", config.nome)
-        return False
+        resultado["status"] = "error"
+        resultado["format"] = formato
+        resultado["error"] = str(e)
+        return resultado
 
 
 def update_client_status(client_id: int, status: str, action: str = "", error: str = ""):
@@ -804,31 +830,34 @@ async def ciclo_monitoramento_cliente(config: ClientConfig) -> dict:
                 update_client_status(config.client_id, "running", f"Processando: {nome_tarefa}...")
                 try:
                     res = await processar_nova_atividade(browser, atividade, config)
-                    if res:
+
+                    # Marca como processada se não for erro
+                    if res["status"] != "error":
                         processadas.add(atividade["id"])
                         salvar_processadas(processadas, config.processadas_path)
 
-                        task_result = {
-                            "name": atividade.get("nome", ""),
-                            "discipline": atividade.get("disciplina", ""),
-                            "status": "success" if res is True else "skipped",
-                        }
-                        resultado["tasks"].append(task_result)
+                    task_result = {
+                        "name": atividade.get("nome", ""),
+                        "discipline": atividade.get("disciplina", ""),
+                        "status": res["status"],
+                        "format": res.get("format", ""),
+                        "error": res.get("error", ""),
+                    }
+                    resultado["tasks"].append(task_result)
+
+                    if res["status"] == "success":
                         resultado["success"] += 1
-                    else:
-                        resultado["tasks"].append({
-                            "name": atividade.get("nome", ""),
-                            "discipline": atividade.get("disciplina", ""),
-                            "status": "error",
-                            "error": "Falha ao processar",
-                        })
+                    elif res["status"] == "error":
                         resultado["error"] += 1
+                    # skipped, not_found, group não contam como erro
+
                 except Exception as e:
                     log(f"Erro ao processar: {e}", config.nome)
                     resultado["tasks"].append({
                         "name": atividade.get("nome", ""),
                         "discipline": atividade.get("disciplina", ""),
                         "status": "error",
+                        "format": "",
                         "error": str(e),
                     })
                     resultado["error"] += 1
