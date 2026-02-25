@@ -347,7 +347,7 @@ def recent_errors():
 def scheduler_jobs():
     """Retorna jobs agendados no scheduler."""
     try:
-        from engine.scheduler import scheduler
+        from engine.scheduler import scheduler, get_queue_status
 
         jobs = []
         for job in scheduler.get_jobs():
@@ -359,12 +359,16 @@ def scheduler_jobs():
                 "next_run_formatted": next_run.strftime("%d/%m %H:%M") if next_run else "N/A"
             })
 
+        # Adiciona status da fila
+        queue_status = get_queue_status()
+
         return jsonify({
             "running": scheduler.running,
-            "jobs": jobs
+            "jobs": jobs,
+            "queue": queue_status
         })
     except Exception as e:
-        return jsonify({"running": False, "jobs": [], "error": str(e)})
+        return jsonify({"running": False, "jobs": [], "queue": {}, "error": str(e)})
 
 
 @api_bp.route("/server/logs")

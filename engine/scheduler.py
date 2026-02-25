@@ -5,6 +5,7 @@ Gerencia jobs de monitoramento por cliente.
 
 import asyncio
 import threading
+import queue
 from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -13,7 +14,9 @@ from loguru import logger
 # Scheduler global
 scheduler = BackgroundScheduler()
 _lock = threading.Lock()
-_running_client = None  # Controle de execucao sequencial
+_running_client = None
+_pending_queue = queue.Queue()  # Fila de clientes aguardando execucao
+_queue_processor_running = False
 
 
 def _get_app_context():
@@ -40,18 +43,51 @@ def _build_client_config(client):
     )
 
 
-def _run_client_sync(client_id: int):
-    """Executa o ciclo de monitoramento para um cliente (sync wrapper)."""
-    global _running_client
+def _process_queue():
+    """Processa a fila de clientes pendentes."""
+    global _queue_processor_running
+
+    while True:
+        try:
+            # Espera ate ter item na fila (timeout de 5s para checar se deve parar)
+            try:
+                client_id = _pending_queue.get(timeout=5)
+            except queue.Empty:
+                # Verifica se ainda tem trabalho
+                with _lock:
+                    if _pending_queue.empty() and _running_client is None:
+                        _queue_processor_running = False
+                        return
+                continue
+
+            # Executa o cliente
+            _execute_client(client_id)
+            _pending_queue.task_done()
+
+        except Exception as e:
+            logger.error(f"Erro no processador de fila: {e}")
+
+
+def _ensure_queue_processor():
+    """Garante que o processador de fila esta rodando."""
+    global _queue_processor_running
 
     with _lock:
-        if _running_client is not None:
-            logger.info(f"Cliente {_running_client} em execucao, adiando cliente {client_id}")
-            return
+        if not _queue_processor_running:
+            _queue_processor_running = True
+            thread = threading.Thread(target=_process_queue, daemon=True)
+            thread.start()
+
+
+def _execute_client(client_id: int):
+    """Executa o ciclo de monitoramento para um cliente."""
+    global _running_client
+
+    # Marca como em execucao
+    with _lock:
         _running_client = client_id
 
     try:
-        # Importa dentro da funcao para evitar circular
         from web import db, create_app
         from web.models import Client, TaskLog
         from engine.monitor import ciclo_monitoramento_cliente
@@ -106,7 +142,28 @@ def _run_client_sync(client_id: int):
             _running_client = None
 
 
-def add_client_job(client_id: int):
+def _run_client_sync(client_id: int):
+    """Agenda execucao de um cliente (adiciona na fila se necessario)."""
+    global _running_client
+
+    with _lock:
+        if _running_client is not None:
+            # Verifica se ja esta na fila para evitar duplicatas
+            pending_list = list(_pending_queue.queue)
+            if client_id not in pending_list:
+                _pending_queue.put(client_id)
+                logger.info(f"Cliente {client_id} adicionado na fila (aguardando {_running_client})")
+            else:
+                logger.debug(f"Cliente {client_id} ja esta na fila, ignorando")
+            _ensure_queue_processor()
+            return
+
+    # Nenhum cliente rodando, executa direto
+    _ensure_queue_processor()
+    _pending_queue.put(client_id)
+
+
+def add_client_job(client_id: int, run_now: bool = False):
     """Adiciona ou atualiza job de um cliente no scheduler."""
     job_id = f"client_{client_id}"
 
@@ -125,8 +182,10 @@ def add_client_job(client_id: int):
             if not client or not client.is_active:
                 return
             interval = client.check_interval
+            client_nome = client.nome
     except Exception:
         interval = 60
+        client_nome = f"ID {client_id}"
 
     scheduler.add_job(
         _run_client_sync,
@@ -137,7 +196,11 @@ def add_client_job(client_id: int):
         replace_existing=True,
         max_instances=1,
     )
-    logger.info(f"Job adicionado: cliente {client_id} (cada {interval} min)")
+    logger.info(f"Job adicionado: {client_nome} (cada {interval} min)")
+
+    # Executa primeira vez imediatamente se solicitado
+    if run_now:
+        run_client_now(client_id)
 
 
 def remove_client_job(client_id: int):
@@ -150,14 +213,25 @@ def remove_client_job(client_id: int):
 
 def run_client_now(client_id: int):
     """Executa o monitoramento de um cliente imediatamente."""
-    thread = threading.Thread(target=_run_client_sync, args=[client_id], daemon=True)
-    thread.start()
-    logger.info(f"Execucao imediata iniciada: cliente {client_id}")
+    _pending_queue.put(client_id)
+    _ensure_queue_processor()
+    logger.info(f"Execucao imediata agendada: cliente {client_id}")
+
+
+def get_queue_status():
+    """Retorna status da fila de execucao."""
+    with _lock:
+        return {
+            "running_client": _running_client,
+            "pending_count": _pending_queue.qsize(),
+            "pending_clients": list(_pending_queue.queue),
+        }
 
 
 def init_scheduler(app):
     """Inicializa o scheduler e carrega todos os clientes ativos."""
     if scheduler.running:
+        logger.info("Scheduler ja esta rodando")
         return
 
     with app.app_context():
@@ -182,3 +256,12 @@ def init_scheduler(app):
 
     scheduler.start()
     logger.info(f"Scheduler iniciado com {len(active_clients)} cliente(s) ativo(s)")
+
+    # Executa todos os clientes imediatamente na inicializacao
+    # para garantir que nao perderam ciclos durante downtime
+    for client in active_clients:
+        _pending_queue.put(client.id)
+
+    if active_clients:
+        _ensure_queue_processor()
+        logger.info(f"Execucao inicial agendada para {len(active_clients)} cliente(s)")
