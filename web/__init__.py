@@ -14,6 +14,14 @@ def create_app():
     app.config["SQLALCHEMY_DATABASE_URI"] = __import__("config").DATABASE_URI
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
+    # Limita conexoes para evitar MaxClients no Supabase
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "pool_size": 2,
+        "max_overflow": 3,
+        "pool_recycle": 300,
+        "pool_pre_ping": True,
+    }
+
     db.init_app(app)
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"
