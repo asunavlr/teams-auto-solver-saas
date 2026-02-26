@@ -17,7 +17,7 @@ jobs:
           port: ${{ secrets.VPS_PORT || 22 }}
           script: |
             set -e
-            cd /opt/teams-auto-solver
+            cd /opt/teams-solver
 
             echo "=== Pulling latest code ==="
             git pull origin main
