@@ -3,12 +3,15 @@
 import csv
 import io
 from datetime import datetime
+from pathlib import Path
 
 from flask import Blueprint, jsonify, request, Response
 
 from web import db
 from web.models import Client, TaskLog
 from web.api_auth import jwt_or_session_required
+
+WORKER_LOG_FILE = Path("/app/logs/worker.log")
 
 api_logs_bp = Blueprint("api_logs", __name__, url_prefix="/api/logs")
 
@@ -125,3 +128,28 @@ def export_csv():
         mimetype="text/csv",
         headers={"Content-Disposition": "attachment; filename=logs_export.csv"},
     )
+
+
+@api_logs_bp.route("/worker")
+@jwt_or_session_required
+def worker_logs():
+    """Retorna ultimas linhas do log do worker Celery."""
+    lines = request.args.get("lines", 100, type=int)
+    lines = min(lines, 500)  # Max 500 linhas
+
+    if not WORKER_LOG_FILE.exists():
+        return jsonify({"lines": [], "total": 0})
+
+    try:
+        with open(WORKER_LOG_FILE, "r", encoding="utf-8", errors="ignore") as f:
+            all_lines = f.readlines()
+
+        # Pega ultimas N linhas
+        last_lines = all_lines[-lines:] if len(all_lines) > lines else all_lines
+
+        return jsonify({
+            "lines": [line.rstrip() for line in last_lines],
+            "total": len(all_lines),
+        })
+    except Exception as e:
+        return jsonify({"error": str(e), "lines": [], "total": 0})

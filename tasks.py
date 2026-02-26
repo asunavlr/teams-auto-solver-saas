@@ -12,10 +12,22 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import asyncio
 from datetime import datetime
+from pathlib import Path
 from celery import Celery
 from loguru import logger
 
 import config as cfg
+
+# Configura loguru para escrever em arquivo compartilhado
+LOG_FILE = Path("/app/logs/worker.log")
+LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+logger.add(
+    LOG_FILE,
+    rotation="10 MB",
+    retention="7 days",
+    format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}",
+    level="INFO",
+)
 
 # Configura Celery
 celery = Celery(
