@@ -466,18 +466,14 @@ def webhook_deploy():
     logger.info("Webhook: iniciando deploy...")
 
     try:
-        # Executa deploy em background
-        project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        deploy_script = f"""
-cd {project_dir}
+        # Executa deploy em background com Docker rebuild
+        deploy_script = """
+cd /opt/teams-solver
 git pull origin main
-pkill -f "python app.py" || true
-sleep 2
-source venv/bin/activate
-nohup python app.py > logs/server.log 2>&1 &
+docker compose up -d --build --force-recreate
 """
         subprocess.Popen(["bash", "-c", deploy_script], start_new_session=True)
-        logger.info("Webhook: deploy iniciado com sucesso!")
+        logger.info("Webhook: deploy com rebuild iniciado!")
         return {"status": "deploying"}, 200
 
     except Exception as e:
