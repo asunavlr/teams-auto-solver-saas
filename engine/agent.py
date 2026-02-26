@@ -91,17 +91,21 @@ class TeamsAgent:
         self.client = Anthropic(api_key=anthropic_key)
         self.vision_calls = 0  # Contador de chamadas Vision (para metricas)
 
-    async def clicar(self, objetivo: str, timeout: int = 3000) -> bool:
+    async def clicar(self, objetivo: str, timeout: int = 5000) -> bool:
         """
         Clica em um elemento: tenta CSS primeiro, fallback para Vision.
 
         Args:
             objetivo: Chave do SELECTORS ou descricao livre
-            timeout: Timeout em ms para tentativas CSS
+            timeout: Timeout em ms para tentativas CSS (default: 5000ms)
 
         Returns:
             True se clicou com sucesso, False caso contrario
         """
+        # Pequena espera para garantir que a pagina carregou
+        import asyncio
+        await asyncio.sleep(1)
+
         # 1. Tenta seletores CSS conhecidos
         if objetivo in self.SELECTORS:
             for selector in self.SELECTORS[objetivo]:
