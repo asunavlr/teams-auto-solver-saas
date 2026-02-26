@@ -1,12 +1,11 @@
 #!/bin/bash
 # =============================================
-# Teams Auto Solver SaaS - Setup VPS
+# Teams Auto Solver SaaS - Setup VPS (Docker)
 # Testado em Ubuntu 22.04/24.04
 # =============================================
 
 set -e
 
-APP_USER="solver"
 APP_DIR="/opt/teams-auto-solver"
 REPO_URL="https://github.com/asunavlr/teams-auto-solver-saas.git"
 
@@ -15,77 +14,68 @@ echo "  TEAMS AUTO SOLVER - Instalacao VPS"
 echo "============================================="
 
 # 1. Atualiza sistema
-echo "[1/8] Atualizando sistema..."
+echo "[1/6] Atualizando sistema..."
 sudo apt update && sudo apt upgrade -y
 
-# 2. Instala dependencias do sistema
-echo "[2/8] Instalando dependencias..."
-sudo apt install -y \
-    python3.11 python3.11-venv python3-pip \
-    nginx certbot python3-certbot-nginx \
-    git curl wget unzip \
-    # Dependencias do Playwright/Chromium
-    libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 \
-    libxkbcommon0 libxdamage1 libgbm1 libpango-1.0-0 \
-    libcairo2 libasound2
-
-# 3. Cria usuario
-echo "[3/8] Configurando usuario..."
-if ! id "$APP_USER" &>/dev/null; then
-    sudo useradd -m -s /bin/bash "$APP_USER"
+# 2. Instala Docker
+echo "[2/6] Instalando Docker..."
+if ! command -v docker &> /dev/null; then
+    curl -fsSL https://get.docker.com | sudo sh
+    sudo usermod -aG docker $USER
+    echo "Docker instalado. Pode ser necessario relogar para usar sem sudo."
 fi
+
+# 3. Instala Nginx + Certbot
+echo "[3/6] Instalando Nginx..."
+sudo apt install -y nginx certbot python3-certbot-nginx
 
 # 4. Clona repositorio
-echo "[4/8] Clonando repositorio..."
+echo "[4/6] Clonando repositorio..."
 sudo mkdir -p "$APP_DIR"
-sudo chown "$APP_USER:$APP_USER" "$APP_DIR"
+sudo chown "$USER:$USER" "$APP_DIR"
 
 if [ -d "$APP_DIR/.git" ]; then
-    sudo -u "$APP_USER" git -C "$APP_DIR" pull
+    git -C "$APP_DIR" pull origin main
 else
-    sudo -u "$APP_USER" git clone "$REPO_URL" "$APP_DIR"
+    git clone "$REPO_URL" "$APP_DIR"
 fi
 
-# 5. Configura ambiente Python
-echo "[5/8] Configurando Python..."
-cd "$APP_DIR"
-sudo -u "$APP_USER" python3.11 -m venv venv
-sudo -u "$APP_USER" bash -c "source venv/bin/activate && pip install -r requirements.txt"
-sudo -u "$APP_USER" bash -c "source venv/bin/activate && playwright install chromium"
-
-# 6. Configura .env
-echo "[6/8] Configurando ambiente..."
+# 5. Configura .env
+echo "[5/6] Configurando ambiente..."
 if [ ! -f "$APP_DIR/.env" ]; then
-    sudo -u "$APP_USER" cp "$APP_DIR/.env.example" "$APP_DIR/.env"
+    cp "$APP_DIR/.env.example" "$APP_DIR/.env"
 
-    # Gera chaves automaticamente
-    SECRET=$(python3.11 -c "import secrets; print(secrets.token_hex(32))")
-    ENC_KEY=$(sudo -u "$APP_USER" bash -c "source venv/bin/activate && python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'")
+    SECRET=$(python3 -c "import secrets; print(secrets.token_hex(32))" 2>/dev/null || openssl rand -hex 32)
+    JWT_SECRET=$(python3 -c "import secrets; print(secrets.token_hex(32))" 2>/dev/null || openssl rand -hex 32)
+    ENC_KEY=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())" 2>/dev/null || echo "GERE_UMA_CHAVE_FERNET")
 
-    sudo -u "$APP_USER" bash -c "cat > $APP_DIR/.env << EOF
+    cat > "$APP_DIR/.env" << EOF
 SECRET_KEY=$SECRET
+JWT_SECRET_KEY=$JWT_SECRET
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=MUDE_ESTA_SENHA
 ENCRYPTION_KEY=$ENC_KEY
 DEFAULT_CHECK_INTERVAL=60
 HOST=0.0.0.0
 PORT=5000
-EOF"
+TIMEZONE=America/Sao_Paulo
+DATABASE_URI=sqlite:///instance/database.db
+EOF
 
     echo ""
-    echo "  IMPORTANTE: Edite $APP_DIR/.env e mude ADMIN_PASSWORD!"
+    echo "  IMPORTANTE: Edite $APP_DIR/.env"
+    echo "  - Mude ADMIN_PASSWORD"
+    echo "  - Configure DATABASE_URI (Supabase)"
     echo ""
 fi
 
-# 7. Configura systemd
-echo "[7/8] Configurando servico..."
-sudo cp "$APP_DIR/deploy/teams-solver.service" /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable teams-solver
-sudo systemctl start teams-solver
+# 6. Sobe os containers
+echo "[6/6] Iniciando containers..."
+cd "$APP_DIR"
+docker compose up -d --build
 
-# 8. Configura Nginx
-echo "[8/8] Configurando Nginx..."
+# Configura Nginx
+echo "Configurando Nginx..."
 sudo cp "$APP_DIR/deploy/nginx.conf" /etc/nginx/sites-available/teams-solver
 sudo ln -sf /etc/nginx/sites-available/teams-solver /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
@@ -100,14 +90,15 @@ echo "  Painel: http://$(curl -s ifconfig.me):80"
 echo ""
 echo "  Proximos passos:"
 echo "  1. Edite /opt/teams-auto-solver/.env"
-echo "     sudo nano /opt/teams-auto-solver/.env"
-echo "  2. Mude ADMIN_PASSWORD"
-echo "  3. Reinicie: sudo systemctl restart teams-solver"
+echo "     nano /opt/teams-auto-solver/.env"
+echo "  2. Mude ADMIN_PASSWORD e configure DATABASE_URI"
+echo "  3. Reinicie: cd /opt/teams-auto-solver && docker compose up -d"
 echo "  4. (Opcional) Configure SSL:"
 echo "     sudo certbot --nginx -d seudominio.com"
 echo ""
 echo "  Comandos uteis:"
-echo "    sudo systemctl status teams-solver"
-echo "    sudo journalctl -u teams-solver -f"
-echo "    sudo systemctl restart teams-solver"
+echo "    docker compose ps"
+echo "    docker compose logs -f app"
+echo "    docker compose restart"
+echo "    docker compose down && docker compose up -d --build"
 echo ""
