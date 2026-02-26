@@ -27,6 +27,7 @@ from engine.solver import (
 )
 from engine.notifier import EmailNotifier
 from engine.agent import TeamsAgent
+from engine.file_searcher import FileSearcher, detectar_arquivo_externo
 
 MAX_PDF_PAGES = 15
 
@@ -629,6 +630,54 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
                     pass
 
         frame = await recuperar_frame_tarefa(browser, frame, nome_tarefa, disciplina)
+
+    # Verifica se instrucoes referenciam arquivo externo
+    arquivo_externo = detectar_arquivo_externo(tarefa_info.get("instrucoes", ""))
+    if arquivo_externo and agent:
+        log(f"Arquivo externo detectado: {arquivo_externo}", config.nome)
+        log(f"Buscando na turma: {disciplina}", config.nome)
+
+        try:
+            searcher = FileSearcher(browser, agent, data_dir)
+            resultado_busca = await searcher.buscar_arquivo(
+                nome_arquivo=arquivo_externo,
+                disciplina=disciplina
+            )
+
+            if resultado_busca["encontrado"]:
+                log(f"Arquivo encontrado! Adicionando conteudo as instrucoes...", config.nome)
+
+                # Adiciona conteudo do arquivo as instrucoes
+                conteudo_arquivo = resultado_busca.get("conteudo", "")
+                if conteudo_arquivo:
+                    tarefa_info["instrucoes"] = f"""
+INSTRUCOES DA TAREFA:
+{tarefa_info.get("instrucoes", "")}
+
+CONTEUDO DO ARQUIVO {arquivo_externo}:
+{conteudo_arquivo}
+"""
+                # Adiciona screenshots do arquivo
+                tarefa_info["screenshots"].extend(resultado_busca.get("screenshots", []))
+
+                # Volta para Assignments e reabre a tarefa
+                log("Voltando para Assignments...", config.nome)
+                await agent.clicar("tarefas")  # Clica em Assignments
+                await asyncio.sleep(3)
+
+                # Reabre a tarefa especifica
+                frame = await recuperar_frame_tarefa(browser, frame, nome_tarefa, disciplina)
+                if frame:
+                    log("Tarefa reaberta com sucesso!", config.nome)
+                else:
+                    log("AVISO: Nao conseguiu reabrir a tarefa", config.nome)
+            else:
+                log(f"Arquivo nao encontrado: {resultado_busca.get('erro', 'erro desconhecido')}", config.nome)
+                log("Continuando apenas com instrucoes originais...", config.nome)
+
+        except Exception as e:
+            log(f"Erro ao buscar arquivo externo: {e}", config.nome)
+            log("Continuando apenas com instrucoes originais...", config.nome)
 
     # Resolve com Claude
     log("Enviando para Claude...", config.nome)

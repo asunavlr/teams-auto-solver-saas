@@ -73,6 +73,33 @@ class TeamsAgent:
             'button:has-text("Voltar")',
             '[data-tid="back-button"]',
         ],
+        "teams": [
+            'button[data-tid="teams-button"]',
+            '[data-tid="teams-button"]',
+            'button[aria-label*="Teams"]',
+            'button[aria-label*="Equipes"]',
+            '[aria-label*="Teams"]',
+            '[aria-label*="Equipes"]',
+            'button:has-text("Teams")',
+            'button:has-text("Equipes")',
+            '[role="tab"]:has-text("Teams")',
+            '[role="tab"]:has-text("Equipes")',
+            'li:has-text("Teams") button',
+        ],
+        "files": [
+            'button[data-tid="files-tab"]',
+            '[data-tid="files-tab"]',
+            'button[aria-label*="Files"]',
+            'button[aria-label*="Arquivos"]',
+            '[aria-label*="Files"]',
+            '[aria-label*="Arquivos"]',
+            'button:has-text("Files")',
+            'button:has-text("Arquivos")',
+            '[role="tab"]:has-text("Files")',
+            '[role="tab"]:has-text("Arquivos")',
+            'a:has-text("Files")',
+            'a:has-text("Arquivos")',
+        ],
     }
 
     # Descricoes para o Claude quando CSS falha
@@ -84,6 +111,8 @@ class TeamsAgent:
         "confirmar": "Botao de confirmacao (Turn in, Entregar, Yes, Sim) em um dialogo",
         "fechar": "Botao X ou Close para fechar modal/painel",
         "voltar": "Botao de voltar ou seta para esquerda",
+        "teams": "Botao Teams ou Equipes no menu lateral esquerdo para ver lista de turmas",
+        "files": "Aba Files ou Arquivos dentro de uma turma para ver materiais compartilhados",
     }
 
     def __init__(self, page: Page, anthropic_key: str):
