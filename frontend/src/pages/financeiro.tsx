@@ -66,6 +66,9 @@ interface ClienteFinanceiro {
   custos_mes: number
   custos_total: number
   lucro_estimado: number
+  tarefas_mes: number
+  limite_tarefas: number | null
+  uso_percentual: number
   tarefas_total: number
   tarefas_sucesso: number
   taxa_sucesso: number
@@ -332,7 +335,7 @@ export function FinanceiroPage() {
                     <TableHead className="text-right">Preco</TableHead>
                     <TableHead className="text-right">Custos/Mes</TableHead>
                     <TableHead className="text-right">Lucro Est.</TableHead>
-                    <TableHead className="text-right">Tarefas</TableHead>
+                    <TableHead className="text-right">Uso/Mês</TableHead>
                     <TableHead>Renovacao</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -360,9 +363,12 @@ export function FinanceiroPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-                          <span className="text-xs">{cliente.tarefas_sucesso}/{cliente.tarefas_total}</span>
-                          <span className="text-xs text-muted-foreground">({cliente.taxa_sucesso}%)</span>
+                          <span className={`text-xs font-medium ${cliente.uso_percentual >= 90 ? 'text-red-500' : cliente.uso_percentual >= 70 ? 'text-yellow-500' : ''}`}>
+                            {cliente.tarefas_mes}/{cliente.limite_tarefas ?? '∞'}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            ({cliente.uso_percentual}%)
+                          </span>
                         </div>
                       </TableCell>
                       <TableCell>

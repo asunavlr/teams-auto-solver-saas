@@ -117,7 +117,12 @@ def clientes_financeiro():
             ApiCost.client_id == client.id
         ).scalar() or 0.0
 
-        # Tarefas
+        # Tarefas (uso do plano)
+        client.verificar_reset_mensal()  # Garante contador atualizado
+        tarefas_mes = client.tarefas_mes
+        limite_tarefas = client.limite_tarefas  # None = ilimitado
+
+        # Taxa de sucesso (histórico)
         tarefas_total = TaskLog.query.filter_by(client_id=client.id).count()
         tarefas_sucesso = TaskLog.query.filter_by(client_id=client.id, status="success").count()
 
@@ -142,6 +147,9 @@ def clientes_financeiro():
             "custos_mes": round(custos_mes, 2),
             "custos_total": round(custos_total, 2),
             "lucro_estimado": round(lucro_estimado, 2),
+            "tarefas_mes": tarefas_mes,
+            "limite_tarefas": limite_tarefas,
+            "uso_percentual": client.uso_percentual,
             "tarefas_total": tarefas_total,
             "tarefas_sucesso": tarefas_sucesso,
             "taxa_sucesso": round((tarefas_sucesso / tarefas_total * 100) if tarefas_total > 0 else 0, 1),
