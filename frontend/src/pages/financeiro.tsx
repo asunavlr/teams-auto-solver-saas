@@ -19,7 +19,6 @@ import {
   Users,
   CreditCard,
   Percent,
-  Calendar,
   CheckCircle2,
   XCircle,
   Clock,
@@ -241,7 +240,7 @@ export function FinanceiroPage() {
                       border: "1px solid hsl(var(--border))",
                       borderRadius: "8px",
                     }}
-                    formatter={(value: number) => formatCurrency(value)}
+                    formatter={(value) => formatCurrency(Number(value) || 0)}
                   />
                   <Legend />
                   <Bar dataKey="receita" name="Receita" fill="#10b981" radius={[4, 4, 0, 0]} />
@@ -271,13 +270,13 @@ export function FinanceiroPage() {
                       cx="50%"
                       cy="50%"
                       outerRadius={80}
-                      label={({ plano, quantidade }) => `${plano}: ${quantidade}`}
+                      label={(entry) => `${entry.plano}: ${entry.quantidade}`}
                     >
                       {resumo.clientes_por_plano.map((_, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value: number) => `${value} clientes`} />
+                    <Tooltip formatter={(value) => `${value} clientes`} />
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="space-y-3 flex-1">
