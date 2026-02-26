@@ -1,5 +1,6 @@
 """
 Configuracoes gerais do Teams Auto Solver SaaS.
+Version: 1.0.1
 """
 
 import os
