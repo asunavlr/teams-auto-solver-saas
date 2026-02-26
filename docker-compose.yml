@@ -1,24 +1,12 @@
-version: '3.8'
-
 services:
   app:
     build: .
     container_name: teams-app
     ports:
       - "5000:5000"
+    env_file: .env
     environment:
-      - DATABASE_URI=${DATABASE_URI}
       - REDIS_URL=redis://redis:6379
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
-      - SECRET_KEY=${SECRET_KEY}
-      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
-      - WEBHOOK_SECRET=${WEBHOOK_SECRET}
-      - TIMEZONE=${TIMEZONE:-America/Sao_Paulo}
-      - DEFAULT_CHECK_INTERVAL=${DEFAULT_CHECK_INTERVAL:-60}
-      - UAZAPI_URL=${UAZAPI_URL:-}
-      - UAZAPI_TOKEN=${UAZAPI_TOKEN:-}
-      - ADMIN_WHATSAPP=${ADMIN_WHATSAPP:-}
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -33,12 +21,9 @@ services:
     build: .
     container_name: teams-worker
     command: celery -A tasks worker --concurrency=2 --loglevel=info
+    env_file: .env
     environment:
-      - DATABASE_URI=${DATABASE_URI}
       - REDIS_URL=redis://redis:6379
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
-      - SECRET_KEY=${SECRET_KEY}
-      - TIMEZONE=${TIMEZONE:-America/Sao_Paulo}
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs

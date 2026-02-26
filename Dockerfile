@@ -1,13 +1,17 @@
-# Stage 1: Build React frontend
-FROM node:20-slim AS frontend-builder
+# ==========================================
+# Stage 1: Build frontend React
+# ==========================================
+FROM node:20-alpine AS frontend-build
 
 WORKDIR /frontend
-COPY frontend/package*.json ./
+COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
-COPY frontend/ ./
+COPY frontend/ .
 RUN npm run build
 
-# Stage 2: Python app
+# ==========================================
+# Stage 2: Python app + frontend dist
+# ==========================================
 FROM python:3.11-slim
 
 # Playwright system dependencies
@@ -48,8 +52,8 @@ RUN playwright install chromium
 # Copy application code
 COPY . .
 
-# Copy built frontend from stage 1
-COPY --from=frontend-builder /frontend/dist /app/frontend/dist
+# Copy frontend build from stage 1
+COPY --from=frontend-build /frontend/dist /app/frontend/dist
 
 # Create necessary directories
 RUN mkdir -p /app/data /app/logs
@@ -58,8 +62,8 @@ RUN mkdir -p /app/data /app/logs
 EXPOSE 5000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:5000/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD curl -sf http://localhost:5000/api/health || exit 1
 
 # Default command
 CMD ["python", "app.py"]
