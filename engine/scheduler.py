@@ -378,9 +378,21 @@ def init_scheduler(app):
 
     # Executa apenas clientes que perderam ciclos
     if clients_to_run_now:
-        for client_id in clients_to_run_now:
-            _pending_queue.put(client_id)
-        _ensure_queue_processor()
-        logger.info(f"Execucao imediata para {len(clients_to_run_now)} cliente(s) que perderam ciclos")
+        if EXECUTION_MODE == "celery":
+            try:
+                from tasks import executar_cliente
+                for client_id in clients_to_run_now:
+                    executar_cliente.delay(client_id)
+                logger.info(f"[Celery] Execucao imediata enviada para {len(clients_to_run_now)} cliente(s)")
+            except Exception as e:
+                logger.warning(f"Celery indisponivel no init, usando fila local: {e}")
+                for client_id in clients_to_run_now:
+                    _pending_queue.put(client_id)
+                _ensure_queue_processor()
+        else:
+            for client_id in clients_to_run_now:
+                _pending_queue.put(client_id)
+            _ensure_queue_processor()
+            logger.info(f"Execucao imediata (local) para {len(clients_to_run_now)} cliente(s)")
     else:
         logger.info("Nenhum cliente perdeu ciclos, aguardando intervalos normais")
