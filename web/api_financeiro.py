@@ -220,6 +220,43 @@ def custos():
     })
 
 
+@api_financeiro_bp.route("/pagamentos", methods=["POST"])
+@jwt_or_session_required
+def criar_pagamento():
+    """Registra um novo pagamento para um cliente."""
+    data = request.get_json(silent=True) or {}
+
+    client_id = data.get("client_id")
+    amount = data.get("amount", 0)
+    months = data.get("months", 1)
+
+    if not client_id:
+        return jsonify({"error": "client_id obrigatorio"}), 400
+
+    client = Client.query.get(client_id)
+    if not client:
+        return jsonify({"error": "Cliente nao encontrado"}), 404
+
+    if not amount or float(amount) <= 0:
+        return jsonify({"error": "Valor deve ser maior que zero"}), 400
+
+    payment = Payment(
+        client_id=client_id,
+        amount=float(amount),
+        months=int(months) if months else 1,
+    )
+    db.session.add(payment)
+    db.session.commit()
+
+    return jsonify({
+        "id": payment.id,
+        "client_id": payment.client_id,
+        "amount": payment.amount,
+        "months": payment.months,
+        "created_at": payment.created_at.isoformat(),
+    }), 201
+
+
 @api_financeiro_bp.route("/receita-mensal")
 @jwt_or_session_required
 def receita_mensal():

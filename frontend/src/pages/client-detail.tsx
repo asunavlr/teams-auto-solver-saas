@@ -11,12 +11,14 @@ import {
   CheckCircle2,
   Clock,
   Crown,
+  DollarSign,
   Edit,
   Loader2,
   Mail,
   MessageSquare,
   Pause,
   Play,
+  Plus,
   RefreshCw,
   Timer,
   Trash2,
@@ -63,6 +65,14 @@ const renewSchema = z.object({
   amount: z.coerce.number().min(0, "Valor invalido"),
 })
 
+// ── Payment form schema ──
+const paymentSchema = z.object({
+  amount: z.coerce.number().min(0.01, "Valor deve ser maior que zero"),
+  months: z.coerce.number().min(1, "Minimo 1 mes").max(12, "Maximo 12 meses"),
+})
+
+type PaymentFormValues = z.infer<typeof paymentSchema>
+
 type RenewFormValues = z.infer<typeof renewSchema>
 
 const container = {
@@ -85,6 +95,7 @@ export function ClientDetailPage() {
 
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [renewOpen, setRenewOpen] = useState(false)
+  const [paymentOpen, setPaymentOpen] = useState(false)
 
   // ── Query: fetch client with logs + payments ──
   const { data: client, isLoading } = useQuery({
@@ -130,6 +141,19 @@ export function ClientDetailPage() {
     onError: () => toast.error("Erro ao renovar assinatura"),
   })
 
+  // ── Mutation: add payment ──
+  const addPayment = useMutation({
+    mutationFn: (data: PaymentFormValues) =>
+      api.post(`/financeiro/pagamentos`, { client_id: Number(id), ...data }),
+    onSuccess: () => {
+      toast.success("Pagamento registrado com sucesso")
+      setPaymentOpen(false)
+      queryClient.invalidateQueries({ queryKey: ["client", id] })
+      queryClient.invalidateQueries({ queryKey: ["financeiro-resumo"] })
+    },
+    onError: () => toast.error("Erro ao registrar pagamento"),
+  })
+
   // ── Mutation: delete ──
   const remove = useMutation({
     mutationFn: () => api.delete(`/clients/${id}`),
@@ -144,6 +168,12 @@ export function ClientDetailPage() {
   const renewForm = useForm<RenewFormValues>({
     resolver: zodResolver(renewSchema) as any,
     defaultValues: { months: 1, amount: 0 },
+  })
+
+  // ── Payment form ──
+  const paymentForm = useForm<PaymentFormValues>({
+    resolver: zodResolver(paymentSchema) as any,
+    defaultValues: { amount: 0, months: 1 },
   })
 
   if (isLoading) {
@@ -420,10 +450,21 @@ export function ClientDetailPage() {
         {/* Payments History */}
         <motion.div variants={item} initial="hidden" animate="show">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-sm">
                 Historico de Pagamentos
               </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  paymentForm.reset({ amount: client.plan_price || 0, months: 1 })
+                  setPaymentOpen(true)
+                }}
+              >
+                <Plus className="h-4 w-4" />
+                Registrar
+              </Button>
             </CardHeader>
             <CardContent className="p-0">
               {payments.length === 0 ? (
@@ -578,6 +619,75 @@ export function ClientDetailPage() {
                   </>
                 ) : (
                   "Confirmar Renovacao"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Payment Dialog ── */}
+      <Dialog open={paymentOpen} onOpenChange={setPaymentOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Registrar Pagamento</DialogTitle>
+            <DialogDescription>
+              Registre um pagamento para {client.nome}
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            onSubmit={paymentForm.handleSubmit((data) => addPayment.mutate(data))}
+            className="space-y-4"
+          >
+            <div className="space-y-2">
+              <Label htmlFor="payment-amount">Valor (R$)</Label>
+              <Input
+                id="payment-amount"
+                type="number"
+                min={0.01}
+                step={0.01}
+                {...paymentForm.register("amount", { valueAsNumber: true })}
+              />
+              {paymentForm.formState.errors.amount && (
+                <p className="text-sm text-destructive">
+                  {paymentForm.formState.errors.amount.message}
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="payment-months">Meses Referentes</Label>
+              <Input
+                id="payment-months"
+                type="number"
+                min={1}
+                max={12}
+                {...paymentForm.register("months", { valueAsNumber: true })}
+              />
+              {paymentForm.formState.errors.months && (
+                <p className="text-sm text-destructive">
+                  {paymentForm.formState.errors.months.message}
+                </p>
+              )}
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setPaymentOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={addPayment.isPending}>
+                {addPayment.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  <>
+                    <DollarSign className="h-4 w-4" />
+                    Registrar
+                  </>
                 )}
               </Button>
             </DialogFooter>
