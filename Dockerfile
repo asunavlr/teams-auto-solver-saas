@@ -1,3 +1,13 @@
+# Stage 1: Build React frontend
+FROM node:20-slim AS frontend-builder
+
+WORKDIR /frontend
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
+
+# Stage 2: Python app
 FROM python:3.11-slim
 
 # Playwright system dependencies
@@ -37,6 +47,9 @@ RUN playwright install chromium
 
 # Copy application code
 COPY . .
+
+# Copy built frontend from stage 1
+COPY --from=frontend-builder /frontend/dist /app/frontend/dist
 
 # Create necessary directories
 RUN mkdir -p /app/data /app/logs
