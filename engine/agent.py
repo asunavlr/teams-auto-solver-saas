@@ -20,10 +20,17 @@ class TeamsAgent:
     SELECTORS = {
         "atividade": [
             'button[data-tid="activity-button"]',
+            '[data-tid="activity-button"]',
+            'button[aria-label*="Activity"]',
+            'button[aria-label*="Atividade"]',
             '[aria-label*="Activity"]',
             '[aria-label*="Atividade"]',
             'button:has-text("Activity")',
             'button:has-text("Atividade")',
+            '[role="tab"]:has-text("Activity")',
+            '[role="tab"]:has-text("Atividade")',
+            'li:has-text("Activity") button',
+            'li:has-text("Atividade") button',
         ],
         "tarefas": [
             'button[data-tid="assignments-button"]',
@@ -102,26 +109,31 @@ class TeamsAgent:
         Returns:
             True se clicou com sucesso, False caso contrario
         """
-        # Pequena espera para garantir que a pagina carregou
         import asyncio
-        await asyncio.sleep(1)
+
+        # Espera a pagina estabilizar (3 segundos)
+        logger.info(f"Aguardando pagina carregar antes de clicar em '{objetivo}'...")
+        await asyncio.sleep(3)
 
         # 1. Tenta seletores CSS conhecidos
         if objetivo in self.SELECTORS:
-            for selector in self.SELECTORS[objetivo]:
+            logger.info(f"Tentando {len(self.SELECTORS[objetivo])} seletores CSS para '{objetivo}'")
+            for i, selector in enumerate(self.SELECTORS[objetivo]):
                 try:
+                    logger.debug(f"  [{i+1}] Tentando: {selector}")
                     await self.page.click(selector, timeout=timeout)
-                    logger.debug(f"CSS funcionou para '{objetivo}': {selector}")
+                    logger.info(f"CSS funcionou para '{objetivo}': {selector}")
                     return True
                 except PlaywrightTimeout:
+                    logger.debug(f"  [{i+1}] Timeout: {selector}")
                     continue
                 except Exception as e:
-                    logger.debug(f"Erro CSS '{selector}': {e}")
+                    logger.debug(f"  [{i+1}] Erro: {selector} - {e}")
                     continue
 
         # 2. Fallback: Claude Vision
         descricao = self.DESCRICOES.get(objetivo, objetivo)
-        logger.warning(f"CSS falhou para '{objetivo}', usando Claude Vision")
+        logger.warning(f"Todos CSS falharam para '{objetivo}', usando Claude Vision")
         return await self._clicar_com_visao(descricao)
 
     async def _clicar_com_visao(self, descricao: str) -> bool:
