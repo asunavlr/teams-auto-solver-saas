@@ -287,11 +287,27 @@ def remove_client_job(client_id: int):
         logger.info(f"Job removido: cliente {client_id}")
 
 
-def run_client_now(client_id: int):
-    """Executa o monitoramento de um cliente imediatamente."""
+def run_client_now(client_id: int, use_celery: bool = True):
+    """Executa o monitoramento de um cliente imediatamente.
+
+    Args:
+        client_id: ID do cliente
+        use_celery: Se True, envia para Celery worker (paralelo).
+                    Se False, executa na fila local do app.
+    """
+    if use_celery:
+        try:
+            from tasks import executar_cliente
+            executar_cliente.delay(client_id)
+            logger.info(f"Execucao imediata enviada ao Celery: cliente {client_id}")
+            return
+        except Exception as e:
+            logger.warning(f"Celery indisponivel, usando fila local: {e}")
+
+    # Fallback para fila local
     _pending_queue.put(client_id)
     _ensure_queue_processor()
-    logger.info(f"Execucao imediata agendada: cliente {client_id}")
+    logger.info(f"Execucao imediata agendada (local): cliente {client_id}")
 
 
 def get_queue_status():
