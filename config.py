@@ -43,6 +43,10 @@ LOG_DIR.mkdir(exist_ok=True)
 # Timezone (padrao: America/Sao_Paulo)
 TIMEZONE = os.getenv("TIMEZONE", "America/Sao_Paulo")
 
+# JWT
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", SECRET_KEY)
+JWT_EXPIRATION_HOURS = int(os.getenv("JWT_EXPIRATION_HOURS", "24"))
+
 # UazAPI (WhatsApp)
 UAZAPI_URL = os.getenv("UAZAPI_URL", "")
 UAZAPI_TOKEN = os.getenv("UAZAPI_TOKEN", "")

@@ -12,6 +12,7 @@ from flask_login import login_required
 import config as cfg
 from web import db
 from web.models import Client, TaskLog, ClientStatus
+from web.api_auth import jwt_or_session_required
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -110,7 +111,7 @@ def get_today_start():
 
 
 @api_bp.route("/dashboard/stats")
-@login_required
+@jwt_or_session_required
 def dashboard_stats():
     """Retorna estatisticas expandidas do dashboard."""
     today_start = get_today_start()
@@ -157,7 +158,7 @@ def dashboard_stats():
 
 
 @api_bp.route("/clients/status")
-@login_required
+@jwt_or_session_required
 def clients_status():
     """Retorna status de todos os clientes."""
     from engine.scheduler import scheduler
@@ -214,7 +215,7 @@ def clients_status():
 
 
 @api_bp.route("/clients/<int:client_id>/status")
-@login_required
+@jwt_or_session_required
 def client_status(client_id):
     """Retorna status detalhado de um cliente."""
     client = Client.query.get_or_404(client_id)
@@ -245,7 +246,7 @@ def client_status(client_id):
 
 
 @api_bp.route("/logs/recent")
-@login_required
+@jwt_or_session_required
 def recent_logs():
     """Retorna logs recentes (para atualizacao em tempo real)."""
     limit = request.args.get("limit", 20, type=int)
@@ -280,7 +281,7 @@ def recent_logs():
 
 
 @api_bp.route("/activity/timeline")
-@login_required
+@jwt_or_session_required
 def activity_timeline():
     """Retorna timeline de atividade por hora (ultimas 24h)."""
     now = get_local_now().replace(tzinfo=None)
@@ -310,7 +311,7 @@ def activity_timeline():
 
 
 @api_bp.route("/activity/daily")
-@login_required
+@jwt_or_session_required
 def activity_daily():
     """Retorna atividade por dia (ultimos 7 dias)."""
     today = get_today_start().replace(tzinfo=None)
@@ -351,7 +352,7 @@ def activity_daily():
 
 
 @api_bp.route("/system/status")
-@login_required
+@jwt_or_session_required
 def system_status():
     """Retorna status do sistema."""
     import psutil
@@ -404,7 +405,7 @@ def system_status():
 
 
 @api_bp.route("/errors/recent")
-@login_required
+@jwt_or_session_required
 def recent_errors():
     """Retorna erros recentes."""
     limit = request.args.get("limit", 10, type=int)
@@ -423,7 +424,7 @@ def recent_errors():
 
 
 @api_bp.route("/scheduler/jobs")
-@login_required
+@jwt_or_session_required
 def scheduler_jobs():
     """Retorna jobs agendados no scheduler."""
     try:
@@ -452,7 +453,7 @@ def scheduler_jobs():
 
 
 @api_bp.route("/server/logs")
-@login_required
+@jwt_or_session_required
 def server_logs():
     """Retorna logs do servidor (arquivo app.log)."""
     lines = request.args.get("lines", 100, type=int)
@@ -494,7 +495,7 @@ def server_logs():
 
 
 @api_bp.route("/server/logs/stream")
-@login_required
+@jwt_or_session_required
 def server_logs_stream():
     """Retorna novas linhas do log desde a ultima posicao."""
     session_id = request.args.get("session", "default")
