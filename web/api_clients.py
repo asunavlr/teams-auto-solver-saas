@@ -323,8 +323,8 @@ def run_client(client_id):
         return jsonify({"error": "Cliente expirado"}), 400
 
     try:
-        from engine.scheduler import executar_agora
-        executar_agora(client.id)
+        from engine.scheduler import run_client_now
+        run_client_now(client.id)
         return jsonify({"message": f"Execucao iniciada para {client.nome}"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -383,8 +383,8 @@ def run_all_clients():
     started = 0
     for client in active:
         try:
-            from engine.scheduler import executar_agora
-            executar_agora(client.id)
+            from engine.scheduler import run_client_now
+            run_client_now(client.id)
             started += 1
         except Exception:
             pass
