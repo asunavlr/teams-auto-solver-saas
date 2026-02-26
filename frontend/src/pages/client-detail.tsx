@@ -17,11 +17,13 @@ import {
   Mail,
   MessageSquare,
   Pause,
+  Pencil,
   Play,
   Plus,
   RefreshCw,
   Timer,
   Trash2,
+  X,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -96,6 +98,8 @@ export function ClientDetailPage() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [renewOpen, setRenewOpen] = useState(false)
   const [paymentOpen, setPaymentOpen] = useState(false)
+  const [editingPayment, setEditingPayment] = useState<{ id: number; amount: number; months: number } | null>(null)
+  const [deletePaymentId, setDeletePaymentId] = useState<number | null>(null)
 
   // ── Query: fetch client with logs + payments ──
   const { data: client, isLoading } = useQuery({
@@ -152,6 +156,31 @@ export function ClientDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["financeiro-resumo"] })
     },
     onError: () => toast.error("Erro ao registrar pagamento"),
+  })
+
+  // ── Mutation: edit payment ──
+  const editPayment = useMutation({
+    mutationFn: (data: PaymentFormValues & { id: number }) =>
+      api.put(`/financeiro/pagamentos/${data.id}`, { amount: data.amount, months: data.months }),
+    onSuccess: () => {
+      toast.success("Pagamento atualizado")
+      setEditingPayment(null)
+      queryClient.invalidateQueries({ queryKey: ["client", id] })
+      queryClient.invalidateQueries({ queryKey: ["financeiro-resumo"] })
+    },
+    onError: () => toast.error("Erro ao atualizar pagamento"),
+  })
+
+  // ── Mutation: delete payment ──
+  const deletePayment = useMutation({
+    mutationFn: (paymentId: number) => api.delete(`/financeiro/pagamentos/${paymentId}`),
+    onSuccess: () => {
+      toast.success("Pagamento excluido")
+      setDeletePaymentId(null)
+      queryClient.invalidateQueries({ queryKey: ["client", id] })
+      queryClient.invalidateQueries({ queryKey: ["financeiro-resumo"] })
+    },
+    onError: () => toast.error("Erro ao excluir pagamento"),
   })
 
   // ── Mutation: delete ──
@@ -477,7 +506,8 @@ export function ClientDetailPage() {
                     <TableRow className="hover:bg-transparent">
                       <TableHead className="pl-6">Data</TableHead>
                       <TableHead>Meses</TableHead>
-                      <TableHead className="pr-6 text-right">Valor</TableHead>
+                      <TableHead className="text-right">Valor</TableHead>
+                      <TableHead className="pr-6 w-[80px]"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -492,8 +522,34 @@ export function ClientDetailPage() {
                             {payment.months === 1 ? "mes" : "meses"}
                           </Badge>
                         </TableCell>
-                        <TableCell className="pr-6 text-right font-medium text-emerald-500">
+                        <TableCell className="text-right font-medium text-emerald-500">
                           {formatCurrency(payment.amount)}
+                        </TableCell>
+                        <TableCell className="pr-6">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => {
+                                setEditingPayment({
+                                  id: payment.id,
+                                  amount: payment.amount,
+                                  months: payment.months,
+                                })
+                              }}
+                            >
+                              <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-red-500 hover:text-red-500 hover:bg-red-500/10"
+                              onClick={() => setDeletePaymentId(payment.id)}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -694,6 +750,85 @@ export function ClientDetailPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* ── Edit Payment Dialog ── */}
+      <Dialog open={!!editingPayment} onOpenChange={(open) => !open && setEditingPayment(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Pagamento</DialogTitle>
+            <DialogDescription>
+              Altere os dados do pagamento
+            </DialogDescription>
+          </DialogHeader>
+          {editingPayment && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                const formData = new FormData(e.currentTarget)
+                editPayment.mutate({
+                  id: editingPayment.id,
+                  amount: Number(formData.get("edit-amount")),
+                  months: Number(formData.get("edit-months")),
+                })
+              }}
+              className="space-y-4"
+            >
+              <div className="space-y-2">
+                <Label htmlFor="edit-amount">Valor (R$)</Label>
+                <Input
+                  id="edit-amount"
+                  name="edit-amount"
+                  type="number"
+                  min={0.01}
+                  step={0.01}
+                  defaultValue={editingPayment.amount}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-months">Meses Referentes</Label>
+                <Input
+                  id="edit-months"
+                  name="edit-months"
+                  type="number"
+                  min={1}
+                  max={12}
+                  defaultValue={editingPayment.months}
+                />
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditingPayment(null)}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={editPayment.isPending}>
+                  {editPayment.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    "Salvar"
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Delete Payment Confirm Dialog ── */}
+      <ConfirmDialog
+        open={!!deletePaymentId}
+        onOpenChange={(open) => !open && setDeletePaymentId(null)}
+        title="Excluir Pagamento"
+        description="Tem certeza que deseja excluir este pagamento? Esta acao e irreversivel."
+        confirmLabel="Excluir"
+        variant="destructive"
+        onConfirm={() => deletePaymentId && deletePayment.mutate(deletePaymentId)}
+      />
 
       {/* ── Delete Confirm Dialog ── */}
       <ConfirmDialog

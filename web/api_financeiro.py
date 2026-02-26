@@ -257,6 +257,50 @@ def criar_pagamento():
     }), 201
 
 
+@api_financeiro_bp.route("/pagamentos/<int:payment_id>", methods=["PUT"])
+@jwt_or_session_required
+def editar_pagamento(payment_id):
+    """Edita um pagamento existente."""
+    payment = Payment.query.get(payment_id)
+    if not payment:
+        return jsonify({"error": "Pagamento nao encontrado"}), 404
+
+    data = request.get_json(silent=True) or {}
+
+    if "amount" in data:
+        amount = float(data["amount"])
+        if amount <= 0:
+            return jsonify({"error": "Valor deve ser maior que zero"}), 400
+        payment.amount = amount
+
+    if "months" in data:
+        payment.months = int(data["months"])
+
+    db.session.commit()
+
+    return jsonify({
+        "id": payment.id,
+        "client_id": payment.client_id,
+        "amount": payment.amount,
+        "months": payment.months,
+        "created_at": payment.created_at.isoformat(),
+    })
+
+
+@api_financeiro_bp.route("/pagamentos/<int:payment_id>", methods=["DELETE"])
+@jwt_or_session_required
+def excluir_pagamento(payment_id):
+    """Exclui um pagamento."""
+    payment = Payment.query.get(payment_id)
+    if not payment:
+        return jsonify({"error": "Pagamento nao encontrado"}), 404
+
+    db.session.delete(payment)
+    db.session.commit()
+
+    return jsonify({"message": "Pagamento excluido"})
+
+
 @api_financeiro_bp.route("/receita-mensal")
 @jwt_or_session_required
 def receita_mensal():
