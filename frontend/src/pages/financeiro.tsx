@@ -270,7 +270,7 @@ export function FinanceiroPage() {
                       cx="50%"
                       cy="50%"
                       outerRadius={80}
-                      label={(entry) => `${entry.plano}: ${entry.quantidade}`}
+                      label={({ name, value }) => `${name}: ${value}`}
                     >
                       {resumo.clientes_por_plano.map((_, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
