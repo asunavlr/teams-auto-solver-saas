@@ -394,3 +394,102 @@ def run_all_clients():
         "started": started,
         "total_active": len(active),
     })
+
+
+# ============================================
+# PROCESSADAS (atividades ja processadas)
+# ============================================
+
+@api_clients_bp.route("/<int:client_id>/processadas")
+@jwt_or_session_required
+def get_processadas(client_id):
+    """Retorna lista de atividades processadas do cliente."""
+    import json
+    from pathlib import Path
+
+    client = Client.query.get_or_404(client_id)
+
+    # Caminho do arquivo de processadas
+    data_dir = Path("/app/data") / f"client_{client_id}"
+    processadas_path = data_dir / "processadas.json"
+
+    if not processadas_path.exists():
+        return jsonify({"items": [], "total": 0})
+
+    try:
+        with open(processadas_path, "r") as f:
+            processadas = json.load(f)
+
+        # Retorna lista de objetos com id
+        items = [{"id": pid, "client_id": client_id} for pid in processadas]
+
+        return jsonify({
+            "items": items,
+            "total": len(items),
+            "client_nome": client.nome,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@api_clients_bp.route("/<int:client_id>/processadas/<path:activity_id>", methods=["DELETE"])
+@jwt_or_session_required
+def delete_processada(client_id, activity_id):
+    """Remove uma atividade da lista de processadas (permite reprocessar)."""
+    import json
+    from pathlib import Path
+
+    client = Client.query.get_or_404(client_id)
+
+    data_dir = Path("/app/data") / f"client_{client_id}"
+    processadas_path = data_dir / "processadas.json"
+
+    if not processadas_path.exists():
+        return jsonify({"error": "Arquivo de processadas nao encontrado"}), 404
+
+    try:
+        with open(processadas_path, "r") as f:
+            processadas = set(json.load(f))
+
+        if activity_id not in processadas:
+            return jsonify({"error": "Atividade nao encontrada"}), 404
+
+        processadas.remove(activity_id)
+
+        with open(processadas_path, "w") as f:
+            json.dump(list(processadas), f)
+
+        return jsonify({
+            "message": f"Atividade removida das processadas",
+            "activity_id": activity_id,
+            "remaining": len(processadas),
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@api_clients_bp.route("/<int:client_id>/processadas", methods=["DELETE"])
+@jwt_or_session_required
+def clear_processadas(client_id):
+    """Limpa todas as atividades processadas do cliente."""
+    import json
+    from pathlib import Path
+
+    client = Client.query.get_or_404(client_id)
+
+    data_dir = Path("/app/data") / f"client_{client_id}"
+    processadas_path = data_dir / "processadas.json"
+
+    if not processadas_path.exists():
+        return jsonify({"message": "Nenhuma atividade processada"})
+
+    try:
+        with open(processadas_path, "w") as f:
+            json.dump([], f)
+
+        return jsonify({
+            "message": "Todas atividades removidas das processadas",
+            "client_nome": client.nome,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

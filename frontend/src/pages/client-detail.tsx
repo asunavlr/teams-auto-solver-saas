@@ -13,6 +13,7 @@ import {
   Crown,
   DollarSign,
   Edit,
+  FileCheck,
   Loader2,
   Mail,
   MessageSquare,
@@ -112,6 +113,16 @@ export function ClientDetailPage() {
     refetchInterval: REFRESH_INTERVALS.CLIENTS_STATUS,
   })
 
+  // ── Query: fetch processadas ──
+  const { data: processadas } = useQuery({
+    queryKey: ["processadas", id],
+    queryFn: async () => {
+      const res = await api.get<{ items: { id: string }[]; total: number }>(`/clients/${id}/processadas`)
+      return res.data
+    },
+    enabled: !!id,
+  })
+
   // ── Mutation: run now ──
   const run = useMutation({
     mutationFn: () => api.post(`/clients/${id}/run`),
@@ -181,6 +192,26 @@ export function ClientDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["financeiro-resumo"] })
     },
     onError: () => toast.error("Erro ao excluir pagamento"),
+  })
+
+  // ── Mutation: delete processada ──
+  const deleteProcessada = useMutation({
+    mutationFn: (activityId: string) => api.delete(`/clients/${id}/processadas/${encodeURIComponent(activityId)}`),
+    onSuccess: () => {
+      toast.success("Atividade removida - pode ser reprocessada")
+      queryClient.invalidateQueries({ queryKey: ["processadas", id] })
+    },
+    onError: () => toast.error("Erro ao remover atividade"),
+  })
+
+  // ── Mutation: clear all processadas ──
+  const clearProcessadas = useMutation({
+    mutationFn: () => api.delete(`/clients/${id}/processadas`),
+    onSuccess: () => {
+      toast.success("Todas atividades removidas")
+      queryClient.invalidateQueries({ queryKey: ["processadas", id] })
+    },
+    onError: () => toast.error("Erro ao limpar atividades"),
   })
 
   // ── Mutation: delete ──
@@ -612,6 +643,79 @@ export function ClientDetailPage() {
                 </TableBody>
               </Table>
             )}
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* ── Processed Activities ── */}
+      <motion.div variants={item} initial="hidden" animate="show">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <FileCheck className="h-4 w-4" />
+              Atividades Processadas
+            </CardTitle>
+            {processadas && processadas.total > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-red-500 hover:text-red-500"
+                onClick={() => clearProcessadas.mutate()}
+                disabled={clearProcessadas.isPending}
+              >
+                {clearProcessadas.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+                Limpar Todas
+              </Button>
+            )}
+          </CardHeader>
+          <CardContent className="p-0">
+            {!processadas || processadas.total === 0 ? (
+              <p className="px-6 pb-6 text-sm text-muted-foreground">
+                Nenhuma atividade processada
+              </p>
+            ) : (
+              <div className="max-h-[300px] overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="pl-6">ID da Atividade</TableHead>
+                      <TableHead className="pr-6 w-[100px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {processadas.items.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell className="pl-6">
+                          <code className="text-xs bg-muted px-2 py-1 rounded break-all">
+                            {item.id}
+                          </code>
+                        </TableCell>
+                        <TableCell className="pr-6">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-500 hover:text-red-500 hover:bg-red-500/10"
+                            onClick={() => deleteProcessada.mutate(item.id)}
+                            disabled={deleteProcessada.isPending}
+                          >
+                            <X className="h-4 w-4" />
+                            Remover
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+            <div className="px-6 py-3 border-t text-xs text-muted-foreground">
+              Total: {processadas?.total ?? 0} atividades processadas.
+              Remova uma para que possa ser reprocessada.
+            </div>
           </CardContent>
         </Card>
       </motion.div>
