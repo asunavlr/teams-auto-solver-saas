@@ -225,16 +225,12 @@ function ServerTerminal() {
   const fetchLogs = useCallback(async () => {
     if (paused) return
     try {
-      const res = await api.get("/server/logs/stream", {
-        params: { session: sessionId.current, lines: 100 },
+      const res = await api.get("/logs/worker", {
+        params: { lines: 200 },
       })
       const newLines: string[] = res.data.lines || []
-      if (newLines.length > 0) {
-        setLines((prev) => {
-          const combined = [...prev, ...newLines]
-          return combined.slice(-1000) // Max 1000 lines
-        })
-      }
+      // Substitui todas as linhas (arquivo completo)
+      setLines(newLines.slice(-500))
     } catch {
       // Silently fail
     }
@@ -286,7 +282,7 @@ function ServerTerminal() {
           </div>
           <div className="flex items-center gap-2 text-xs font-medium text-zinc-300">
             <Terminal className="h-3.5 w-3.5" />
-            Logs do Servidor
+            Logs do Worker (Celery)
           </div>
           <Badge variant="outline" className="h-5 border-emerald-500/30 bg-emerald-500/10 px-1.5 text-[10px] text-emerald-400">
             <span className="mr-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
