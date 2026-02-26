@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom"
-import { LayoutDashboard, Users, FileText, UserPlus, LogOut } from "lucide-react"
+import { LayoutDashboard, Users, FileText, UserPlus, LogOut, DollarSign } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useLogout } from "@/hooks/use-auth"
 import { useAuthStore } from "@/stores/auth-store"
@@ -8,6 +8,7 @@ const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/clients", icon: Users, label: "Clientes" },
   { to: "/logs", icon: FileText, label: "Logs" },
+  { to: "/financeiro", icon: DollarSign, label: "Financeiro" },
 ]
 
 export function Sidebar() {

@@ -7,6 +7,7 @@ import { ClientCreatePage } from "@/pages/client-create"
 import { ClientEditPage } from "@/pages/client-edit"
 import { ClientDetailPage } from "@/pages/client-detail"
 import { LogsPage } from "@/pages/logs"
+import { FinanceiroPage } from "@/pages/financeiro"
 
 export const router = createBrowserRouter([
   {
@@ -22,6 +23,7 @@ export const router = createBrowserRouter([
       { path: "/clients/:id", element: <ClientDetailPage /> },
       { path: "/clients/:id/edit", element: <ClientEditPage /> },
       { path: "/logs", element: <LogsPage /> },
+      { path: "/financeiro", element: <FinanceiroPage /> },
     ],
   },
 ], {

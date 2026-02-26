@@ -44,6 +44,7 @@ def create_app():
     from web.api_clients import api_clients_bp
     from web.api_plans import api_plans_bp
     from web.api_logs import api_logs_bp
+    from web.api_financeiro import api_financeiro_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(main_bp)
@@ -52,6 +53,7 @@ def create_app():
     app.register_blueprint(api_clients_bp)
     app.register_blueprint(api_plans_bp)
     app.register_blueprint(api_logs_bp)
+    app.register_blueprint(api_financeiro_bp)
 
     with app.app_context():
         from web import models  # noqa: F401

@@ -897,11 +897,23 @@ async def ciclo_monitoramento_cliente(config: ClientConfig) -> dict:
         else:
             update_client_status(config.client_id, "error", "", f"{resultado['error']} erro(s)")
 
-    # Log das estatisticas do agente
+    # Log das estatisticas do agente e salva custos
     if agent:
         stats = agent.get_stats()
         if stats["vision_calls"] > 0:
-            log(f"Agente usou Vision {stats['vision_calls']}x (custo estimado: R${stats['estimated_cost']:.2f})", config.nome)
+            custo = stats['estimated_cost']
+            log(f"Agente usou Vision {stats['vision_calls']}x (custo estimado: R${custo:.2f})", config.nome)
+            # Salva custo no banco
+            try:
+                from web.models import ApiCost
+                ApiCost.registrar(
+                    client_id=config.client_id,
+                    tipo="vision",
+                    custo=custo,
+                    descricao=f"Vision usado {stats['vision_calls']}x no ciclo"
+                )
+            except Exception as e:
+                log(f"Erro ao salvar custo: {e}", config.nome)
 
     log(f"Ciclo finalizado: {resultado['success']} ok, {resultado['error']} erros", config.nome)
     return resultado

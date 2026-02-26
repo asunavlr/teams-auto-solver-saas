@@ -243,3 +243,49 @@ class ClientStatus(db.Model):
                 "last_error": obj.last_error
             }
         return {"status": "idle", "current_action": "", "started_at": None, "last_error": ""}
+
+
+class ApiCost(db.Model):
+    """Rastreamento de custos de API (Vision, Claude, etc)."""
+    __tablename__ = "api_costs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    client_id = db.Column(db.Integer, db.ForeignKey("clients.id"), nullable=False)
+    tipo = db.Column(db.String(50), nullable=False)  # vision, claude_task, etc
+    custo = db.Column(db.Float, default=0.0)  # em BRL
+    descricao = db.Column(db.String(300), default="")
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    client = db.relationship("Client", backref=db.backref("api_costs", lazy="dynamic"))
+
+    @classmethod
+    def registrar(cls, client_id: int, tipo: str, custo: float, descricao: str = ""):
+        """Registra um custo de API."""
+        obj = cls(
+            client_id=client_id,
+            tipo=tipo,
+            custo=custo,
+            descricao=descricao
+        )
+        db.session.add(obj)
+        db.session.commit()
+        return obj
+
+    @classmethod
+    def custo_cliente_mes(cls, client_id: int) -> float:
+        """Retorna custo total do cliente no mês atual."""
+        inicio_mes = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        total = db.session.query(db.func.sum(cls.custo)).filter(
+            cls.client_id == client_id,
+            cls.created_at >= inicio_mes
+        ).scalar()
+        return total or 0.0
+
+    @classmethod
+    def custo_total_mes(cls) -> float:
+        """Retorna custo total de todos os clientes no mês atual."""
+        inicio_mes = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        total = db.session.query(db.func.sum(cls.custo)).filter(
+            cls.created_at >= inicio_mes
+        ).scalar()
+        return total or 0.0
