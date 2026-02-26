@@ -31,7 +31,7 @@ import { PageHeader } from "@/components/shared/page-header"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { FormatBadge } from "@/components/shared/format-badge"
 import api from "@/lib/api"
-import { timeAgo, cn } from "@/lib/utils"
+import { timeAgo, timeUntil, cn } from "@/lib/utils"
 import { REFRESH_INTERVALS } from "@/lib/constants"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -511,7 +511,7 @@ export function DashboardPage() {
                           </span>
                         </TableCell>
                         <TableCell className="pr-6 text-right text-xs text-muted-foreground">
-                          {client.next_check ? timeAgo(client.next_check) : "—"}
+                          {client.next_check ? timeUntil(client.next_check) : "—"}
                         </TableCell>
                       </TableRow>
                     ))

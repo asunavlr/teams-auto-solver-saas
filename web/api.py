@@ -182,7 +182,7 @@ def clients_status():
         try:
             job = scheduler.get_job(f"client_{client.id}")
             if job and job.next_run_time:
-                next_check = job.next_run_time.strftime("%H:%M")
+                next_check = job.next_run_time.isoformat()
         except Exception:
             pass
 

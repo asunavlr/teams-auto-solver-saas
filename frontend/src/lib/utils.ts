@@ -33,3 +33,16 @@ export function timeAgo(date: string | Date): string {
   const diffDays = Math.floor(diffHours / 24)
   return `${diffDays}d`
 }
+
+export function timeUntil(date: string | Date): string {
+  const d = typeof date === "string" ? new Date(date) : date
+  const now = new Date()
+  const diffMs = d.getTime() - now.getTime()
+  const diffMin = Math.floor(diffMs / 60000)
+  if (diffMin < 1) return "agora"
+  if (diffMin < 60) return `em ${diffMin} min`
+  const diffHours = Math.floor(diffMin / 60)
+  if (diffHours < 24) return `em ${diffHours}h`
+  const diffDays = Math.floor(diffHours / 24)
+  return `em ${diffDays}d`
+}
