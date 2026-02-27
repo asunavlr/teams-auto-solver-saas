@@ -294,12 +294,13 @@ class FileSearcher:
             try:
                 arquivo = self.page.locator(f'text=/{re.escape(variacao)}/i').first
                 await arquivo.click(timeout=3000)
-                await asyncio.sleep(2)
                 logger.info(f"Arquivo/pasta encontrado via CSS: {variacao}")
+                await asyncio.sleep(5)  # Espera 5 segundos para preview carregar
 
                 # Verifica se abriu um arquivo ou uma pasta
                 # Se a URL mudou pra preview, eh arquivo
                 current_url = self.page.url
+                logger.debug(f"URL atual: {current_url}")
                 if "preview" in current_url.lower() or "viewer" in current_url.lower():
                     logger.info("Arquivo aberto!")
                     return True
@@ -321,12 +322,14 @@ class FileSearcher:
                 f"Pode ser PDF, Word, PowerPoint ou pasta com esse nome."
             )
             if encontrou:
-                await asyncio.sleep(2)
                 logger.info(f"Vision encontrou algo relacionado a '{nome_curto}'")
+                await asyncio.sleep(5)  # Espera 5 segundos para preview carregar
 
                 # Verifica se abriu arquivo
                 current_url = self.page.url
+                logger.debug(f"URL atual: {current_url}")
                 if "preview" in current_url.lower() or "viewer" in current_url.lower():
+                    logger.info("Arquivo aberto!")
                     return True
 
                 # Pode ter aberto pasta, busca recursivamente
