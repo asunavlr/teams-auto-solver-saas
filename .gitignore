@@ -8,5 +8,3 @@ venv/
 *.spec
 dist/
 build/
-test_data/
-test_local.py
