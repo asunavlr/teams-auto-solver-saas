@@ -289,12 +289,12 @@ class FileSearcher:
             path=str(self.data_dir / f"shared_search_{nivel}.png")
         )
 
-        # 1. Primeiro tenta CSS para cada variacao
+        # 1. Primeiro tenta CSS para cada variacao (duplo clique para abrir)
         for variacao in variacoes:
             try:
                 arquivo = self.page.locator(f'text=/{re.escape(variacao)}/i').first
-                await arquivo.click(timeout=3000)
-                logger.info(f"Arquivo/pasta encontrado via CSS: {variacao}")
+                await arquivo.dblclick(timeout=3000)
+                logger.info(f"Duplo clique em arquivo/pasta via CSS: {variacao}")
                 await asyncio.sleep(5)  # Espera 5 segundos para preview carregar
 
                 # Verifica se abriu um arquivo ou uma pasta
@@ -316,13 +316,14 @@ class FileSearcher:
         nome_curto = variacoes[0] if variacoes else nome
 
         try:
-            # Pede pro Vision encontrar o arquivo
+            # Pede pro Vision encontrar o arquivo (duplo clique para abrir)
             encontrou = await self.agent._clicar_com_visao(
                 f"Arquivo ou documento com nome parecido com '{nome_curto}' na lista de arquivos do Teams. "
-                f"Pode ser PDF, Word, PowerPoint ou pasta com esse nome."
+                f"Pode ser PDF, Word, PowerPoint ou pasta com esse nome.",
+                duplo_clique=True
             )
             if encontrou:
-                logger.info(f"Vision encontrou algo relacionado a '{nome_curto}'")
+                logger.info(f"Vision encontrou e deu duplo clique em '{nome_curto}'")
                 await asyncio.sleep(5)  # Espera 5 segundos para preview carregar
 
                 # Verifica se abriu arquivo
