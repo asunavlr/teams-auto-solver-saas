@@ -22,8 +22,8 @@ from pptx.util import Pt as PptxPt
 from loguru import logger
 
 CLAUDE_MAX_RETRIES = 3
-FORMATOS_CODIGO = ["py", "js", "ts", "java", "c", "cpp", "css", "sql"]
-FORMATOS_ARQUIVO = ["html", "docx", "xlsx", "pptx", "zip"] + FORMATOS_CODIGO
+FORMATOS_CODIGO = ["py", "js", "ts", "java", "c", "cpp", "css", "sql", "kotlin"]
+FORMATOS_ARQUIVO = ["html", "docx", "xlsx", "pptx", "zip", "android"] + FORMATOS_CODIGO
 TODOS_FORMATOS = FORMATOS_ARQUIVO + ["txt", "texto"]
 
 
@@ -55,6 +55,13 @@ def detectar_formato_resposta(content: str) -> str:
         return "css"
     if any(x in content_lower for x in [".sql", "script sql", "consulta sql", "query sql"]):
         return "sql"
+    if any(x in content_lower for x in [".kt", ".kotlin", "kotlin"]):
+        return "kotlin"
+    if any(x in content_lower for x in [
+        "android studio", "android app", "aplicativo android", "app android",
+        "activity", "layout xml", "androidmanifest", "projeto android"
+    ]):
+        return "android"
     if any(x in content_lower for x in [".zip", "arquivo zip", "compactado"]):
         return "zip"
 
@@ -90,6 +97,10 @@ def detectar_formato_da_resposta(resposta: str) -> str | None:
         return "css"
     if "```sql" in resposta_lower:
         return "sql"
+    if "```kotlin" in resposta_lower or "```kt" in resposta_lower:
+        return "kotlin"
+    if "```xml" in resposta_lower and ("android" in resposta_lower or "layout" in resposta_lower):
+        return "android"
 
     return None
 
@@ -351,6 +362,7 @@ def extrair_projeto_multi_arquivo(resposta: str, nome_tarefa: str, data_dir: Pat
         "html": "html", "css": "css", "javascript": "js", "js": "js",
         "typescript": "ts", "ts": "ts", "python": "py", "py": "py",
         "java": "java", "c": "c", "cpp": "cpp", "sql": "sql",
+        "kotlin": "kt", "kt": "kt", "xml": "xml",
     }
 
     contadores = {}
@@ -372,6 +384,243 @@ def extrair_projeto_multi_arquivo(resposta: str, nome_tarefa: str, data_dir: Pat
         return [zip_path]
 
     return arquivos
+
+
+def criar_projeto_android(resposta: str, nome_tarefa: str, data_dir: Path) -> list:
+    """
+    Cria projeto Android Studio completo a partir da resposta do Claude.
+
+    Espera que Claude gere blocos marcados com:
+    - ```java ou ```kotlin para código
+    - ```xml para layouts e manifest
+
+    Estrutura gerada:
+    NomeProjeto/
+    ├── app/src/main/java/com/example/app/
+    ├── app/src/main/res/layout/
+    ├── app/src/main/AndroidManifest.xml
+    └── outros arquivos de configuração
+    """
+    import shutil
+
+    # Nome do projeto limpo
+    nome_limpo = re.sub(r'[^\w\s-]', '', nome_tarefa)[:30].strip().replace(' ', '_')
+    nome_projeto = nome_limpo or "MeuApp"
+    package_name = "com.example." + nome_projeto.lower().replace('_', '').replace('-', '')
+    package_path = package_name.replace('.', '/')
+
+    # Diretório temporário do projeto
+    projeto_dir = data_dir / nome_projeto
+    if projeto_dir.exists():
+        shutil.rmtree(projeto_dir)
+
+    # Estrutura de diretórios
+    dirs = [
+        projeto_dir / "app" / "src" / "main" / "java" / package_path,
+        projeto_dir / "app" / "src" / "main" / "res" / "layout",
+        projeto_dir / "app" / "src" / "main" / "res" / "values",
+        projeto_dir / "app" / "src" / "main" / "res" / "drawable",
+    ]
+    for d in dirs:
+        d.mkdir(parents=True, exist_ok=True)
+
+    # Parse dos blocos de código
+    blocos = re.findall(r'```(\w+)\s*\n(.*?)```', resposta, re.DOTALL)
+
+    java_files = []
+    kotlin_files = []
+    xml_files = []
+
+    for lang, conteudo in blocos:
+        conteudo = conteudo.strip()
+        if not conteudo:
+            continue
+        lang_lower = lang.lower()
+
+        if lang_lower == "java":
+            java_files.append(conteudo)
+        elif lang_lower in ["kotlin", "kt"]:
+            kotlin_files.append(conteudo)
+        elif lang_lower == "xml":
+            xml_files.append(conteudo)
+
+    # Detecta nome da classe principal nos arquivos Java/Kotlin
+    def extrair_nome_classe(codigo):
+        match = re.search(r'class\s+(\w+)', codigo)
+        return match.group(1) if match else None
+
+    # Salva arquivos Java
+    for i, codigo in enumerate(java_files):
+        nome_classe = extrair_nome_classe(codigo) or f"Classe{i+1}"
+        filepath = projeto_dir / "app" / "src" / "main" / "java" / package_path / f"{nome_classe}.java"
+        # Adiciona package se não tiver
+        if "package " not in codigo:
+            codigo = f"package {package_name};\n\n{codigo}"
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(codigo)
+
+    # Salva arquivos Kotlin
+    for i, codigo in enumerate(kotlin_files):
+        nome_classe = extrair_nome_classe(codigo) or f"Classe{i+1}"
+        filepath = projeto_dir / "app" / "src" / "main" / "java" / package_path / f"{nome_classe}.kt"
+        # Adiciona package se não tiver
+        if "package " not in codigo:
+            codigo = f"package {package_name}\n\n{codigo}"
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(codigo)
+
+    # Salva arquivos XML
+    for i, codigo in enumerate(xml_files):
+        if "AndroidManifest" in codigo or "manifest" in codigo.lower()[:100]:
+            filepath = projeto_dir / "app" / "src" / "main" / "AndroidManifest.xml"
+        elif "layout" in codigo.lower()[:200] or "LinearLayout" in codigo or "RelativeLayout" in codigo or "ConstraintLayout" in codigo:
+            # Tenta extrair nome do layout
+            nome_layout = f"activity_main" if i == 0 else f"layout_{i+1}"
+            filepath = projeto_dir / "app" / "src" / "main" / "res" / "layout" / f"{nome_layout}.xml"
+        elif "resources" in codigo.lower()[:100] and "string" in codigo.lower():
+            filepath = projeto_dir / "app" / "src" / "main" / "res" / "values" / "strings.xml"
+        else:
+            filepath = projeto_dir / "app" / "src" / "main" / "res" / "layout" / f"layout_{i+1}.xml"
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(codigo)
+
+    # Gera AndroidManifest.xml se não foi fornecido
+    manifest_path = projeto_dir / "app" / "src" / "main" / "AndroidManifest.xml"
+    if not manifest_path.exists():
+        # Detecta a Activity principal
+        main_activity = "MainActivity"
+        for codigo in java_files + kotlin_files:
+            if "AppCompatActivity" in codigo or "Activity" in codigo:
+                nome = extrair_nome_classe(codigo)
+                if nome:
+                    main_activity = nome
+                    break
+
+        manifest_content = f'''<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="{package_name}">
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.AppCompat.Light.DarkActionBar">
+        <activity
+            android:name=".{main_activity}"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>
+'''
+        with open(manifest_path, "w", encoding="utf-8") as f:
+            f.write(manifest_content)
+
+    # Gera strings.xml se não foi fornecido
+    strings_path = projeto_dir / "app" / "src" / "main" / "res" / "values" / "strings.xml"
+    if not strings_path.exists():
+        strings_content = f'''<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">{nome_projeto}</string>
+</resources>
+'''
+        with open(strings_path, "w", encoding="utf-8") as f:
+            f.write(strings_content)
+
+    # Gera build.gradle (app level)
+    build_gradle_app = f'''plugins {{
+    id 'com.android.application'
+}}
+
+android {{
+    namespace '{package_name}'
+    compileSdk 34
+
+    defaultConfig {{
+        applicationId "{package_name}"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }}
+
+    buildTypes {{
+        release {{
+            minifyEnabled false
+        }}
+    }}
+    compileOptions {{
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }}
+}}
+
+dependencies {{
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.11.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+}}
+'''
+    with open(projeto_dir / "app" / "build.gradle", "w", encoding="utf-8") as f:
+        f.write(build_gradle_app)
+
+    # Gera build.gradle (project level)
+    build_gradle_project = '''plugins {
+    id 'com.android.application' version '8.2.0' apply false
+}
+'''
+    with open(projeto_dir / "build.gradle", "w", encoding="utf-8") as f:
+        f.write(build_gradle_project)
+
+    # Gera settings.gradle
+    settings_gradle = f'''pluginManagement {{
+    repositories {{
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }}
+}}
+dependencyResolutionManagement {{
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {{
+        google()
+        mavenCentral()
+    }}
+}}
+
+rootProject.name = "{nome_projeto}"
+include ':app'
+'''
+    with open(projeto_dir / "settings.gradle", "w", encoding="utf-8") as f:
+        f.write(settings_gradle)
+
+    # Gera gradle.properties
+    gradle_properties = '''android.useAndroidX=true
+android.enableJetifier=true
+'''
+    with open(projeto_dir / "gradle.properties", "w", encoding="utf-8") as f:
+        f.write(gradle_properties)
+
+    # Zipa o projeto
+    zip_path = data_dir / f"{nome_projeto}.zip"
+    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        for root, dirs, files in os.walk(projeto_dir):
+            for file in files:
+                file_path = Path(root) / file
+                arcname = file_path.relative_to(data_dir)
+                zipf.write(file_path, arcname)
+
+    # Remove diretório temporário
+    shutil.rmtree(projeto_dir)
+
+    logger.info(f"Projeto Android criado: {zip_path}")
+    return [str(zip_path)]
 
 
 # ============================================================
@@ -406,12 +655,14 @@ Exemplos:
 - Se pede codigo Python -> [FORMATO: py]
 - Se pede codigo JavaScript -> [FORMATO: js]
 - Se pede codigo TypeScript -> [FORMATO: ts]
-- Se pede codigo Java -> [FORMATO: java]
+- Se pede codigo Java (nao Android) -> [FORMATO: java]
+- Se pede codigo Kotlin -> [FORMATO: kotlin]
 - Se pede codigo C -> [FORMATO: c]
 - Se pede codigo C++ -> [FORMATO: cpp]
 - Se pede CSS/folha de estilo -> [FORMATO: css]
 - Se pede SQL/consultas banco de dados -> [FORMATO: sql]
 - Se pede multiplos arquivos (ex: HTML+CSS+JS) -> [FORMATO: zip]
+- Se pede app/projeto Android Studio -> [FORMATO: android]
 - Se pede resposta em texto simples na caixa -> [FORMATO: texto]
 
 REGRAS DA RESPOSTA:
@@ -422,7 +673,12 @@ REGRAS DA RESPOSTA:
 5. Para PPTX: separe slides com --- e use texto normal
 6. Para CODIGO: escreva codigo LIMPO e FUNCIONAL, com POUCOS comentarios (apenas onde realmente necessario)
 7. NAO inclua explicacoes sobre o que voce fez, apenas entregue o conteudo solicitado
-8. NAO seja excessivamente formal ou robotico - seja natural como um aluno"""
+8. NAO seja excessivamente formal ou robotico - seja natural como um aluno
+9. Para ANDROID: gere cada arquivo em bloco separado:
+   - Codigo Java em ```java ... ``` ou Kotlin em ```kotlin ... ```
+   - Layouts XML em ```xml ... ``` (activity_main.xml, etc)
+   - NAO inclua AndroidManifest.xml nem build.gradle (serao gerados automaticamente)
+   - Inclua imports necessarios no codigo Java/Kotlin"""
 
     content = [{"type": "text", "text": prompt}]
 

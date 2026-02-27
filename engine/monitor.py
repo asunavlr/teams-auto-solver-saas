@@ -23,6 +23,7 @@ from engine.solver import (
     criar_arquivo_resposta,
     extrair_multiplos_arquivos,
     extrair_projeto_multi_arquivo,
+    criar_projeto_android,
     FORMATOS_CODIGO,
 )
 from engine.notifier import EmailNotifier
@@ -800,9 +801,11 @@ CONTEUDO DO ARQUIVO {arquivo_externo}:
 
     # Cria arquivos
     arquivos = []
-    if formato == "zip":
+    if formato == "android":
+        arquivos = criar_projeto_android(resposta, nome_tarefa, data_dir)
+    elif formato == "zip":
         arquivos = extrair_projeto_multi_arquivo(resposta, nome_tarefa, data_dir)
-    elif formato in ["html"] + FORMATOS_CODIGO:
+    elif formato in ["html", "kotlin"] + FORMATOS_CODIGO:
         arquivos = extrair_multiplos_arquivos(resposta, formato, nome_tarefa, data_dir)
 
     if not arquivos and formato not in ["texto"]:
