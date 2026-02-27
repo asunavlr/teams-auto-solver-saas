@@ -165,12 +165,13 @@ class TeamsAgent:
         logger.warning(f"Todos CSS falharam para '{objetivo}', usando Claude Vision")
         return await self._clicar_com_visao(descricao)
 
-    async def _clicar_com_visao(self, descricao: str) -> bool:
+    async def _clicar_com_visao(self, descricao: str, duplo_clique: bool = False) -> bool:
         """
         Usa Claude Vision para identificar e clicar em elemento.
 
         Args:
             descricao: Descricao do que queremos clicar
+            duplo_clique: Se True, faz duplo clique em vez de clique simples
 
         Returns:
             True se clicou, False se nao encontrou
@@ -227,8 +228,12 @@ NOT_FOUND: motivo breve"""
             click_match = re.search(r"CLICK:\s*(\d+)\s*,\s*(\d+)", text)
             if click_match:
                 x, y = int(click_match.group(1)), int(click_match.group(2))
-                logger.info(f"Claude Vision: clicando em ({x}, {y}) para '{descricao}'")
-                await self.page.mouse.click(x, y)
+                if duplo_clique:
+                    logger.info(f"Claude Vision: duplo clique em ({x}, {y}) para '{descricao}'")
+                    await self.page.mouse.dblclick(x, y)
+                else:
+                    logger.info(f"Claude Vision: clicando em ({x}, {y}) para '{descricao}'")
+                    await self.page.mouse.click(x, y)
                 await self.page.wait_for_timeout(1000)
                 return True
 

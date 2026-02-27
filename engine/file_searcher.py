@@ -338,15 +338,15 @@ class FileSearcher:
         if nivel == 0:
             logger.info("Arquivo nao encontrado, procurando pastas...")
             try:
+                # Duplo clique para abrir a pasta
                 encontrou_pasta = await self.agent._clicar_com_visao(
                     "Uma pasta ou diretorio na lista de arquivos do Teams. "
-                    "Procure por icone de pasta amarela e clique nela."
+                    "Procure por icone de pasta amarela e clique nela.",
+                    duplo_clique=True
                 )
                 if encontrou_pasta:
-                    # Apenas um clique para selecionar/identificar a pasta
-                    # O clique ja foi feito pelo _clicar_com_visao
-                    logger.info("Pasta clicada, aguardando 10 segundos para carregar...")
-                    await asyncio.sleep(10)  # Espera 10 segundos apos clicar na pasta
+                    logger.info("Duplo clique na pasta, aguardando 10 segundos para carregar...")
+                    await asyncio.sleep(10)  # Espera 10 segundos apos abrir a pasta
                     logger.info("Pasta aberta, buscando arquivo dentro...")
                     return await self._buscar_arquivo(nome, nivel + 1)
             except Exception as e:
