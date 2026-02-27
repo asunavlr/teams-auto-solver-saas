@@ -475,6 +475,25 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
     # Screenshot para debug
     await browser.page.screenshot(path=str(data_dir / "assignments_page.png"))
 
+    # Verifica se esta dentro de uma tarefa (precisa voltar para a lista)
+    # Se encontrar botao Back/Voltar, clica para voltar a lista
+    try:
+        back_btn = frame.locator(
+            'button[aria-label*="Back"], button[aria-label*="Voltar"], '
+            'button:has-text("Back"), button:has-text("Voltar"), '
+            '[data-tid="back-button"]'
+        ).first
+        await back_btn.click(timeout=3000)
+        log("  Voltando para lista de tarefas...", config.nome)
+        await asyncio.sleep(3)
+        # Atualiza o frame apos voltar
+        for f in browser.page.frames:
+            if "assignments" in f.url.lower():
+                frame = f
+                break
+    except Exception:
+        pass  # Nao encontrou botao de voltar, ja esta na lista
+
     # Busca em cada aba
     tarefa_encontrada = False
     abas_tentadas = 0
@@ -782,7 +801,7 @@ CONTEUDO DO ARQUIVO {arquivo_externo}:
 
     # Resolve com Claude
     log("Enviando para Claude...", config.nome)
-    resposta = resolver_com_claude(tarefa_info, config.anthropic_key)
+    resposta = resolver_com_claude(tarefa_info, config.anthropic_key, config.nome)
 
     if not resposta:
         log("Falha ao resolver", config.nome)

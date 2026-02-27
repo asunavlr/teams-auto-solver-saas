@@ -627,14 +627,19 @@ android.enableJetifier=true
 # CLAUDE API
 # ============================================================
 
-def resolver_com_claude(tarefa: dict, api_key: str) -> str | None:
+def resolver_com_claude(tarefa: dict, api_key: str, nome_aluno: str = "") -> str | None:
     """Resolve tarefa usando Claude API com retry."""
     client = anthropic.Anthropic(api_key=api_key)
 
     formatos_str = ", ".join(TODOS_FORMATOS)
 
+    # Instrucao sobre nome do aluno
+    nome_instrucao = ""
+    if nome_aluno:
+        nome_instrucao = f"\nSeu nome e: {nome_aluno}. Use este nome se a tarefa exigir identificacao."
+
     prompt = f"""Voce e um estudante universitario resolvendo suas proprias tarefas.
-Escreva de forma NATURAL e HUMANA, como um aluno real escreveria.
+Escreva de forma NATURAL e HUMANA, como um aluno real escreveria.{nome_instrucao}
 
 TAREFA: {tarefa.get('nome', 'Sem nome')}
 
@@ -674,7 +679,8 @@ REGRAS DA RESPOSTA:
 6. Para CODIGO: escreva codigo LIMPO e FUNCIONAL, com POUCOS comentarios (apenas onde realmente necessario)
 7. NAO inclua explicacoes sobre o que voce fez, apenas entregue o conteudo solicitado
 8. NAO seja excessivamente formal ou robotico - seja natural como um aluno
-9. Para ANDROID: gere cada arquivo em bloco separado:
+9. NUNCA use placeholders como [Seu Nome], [Nome], [Seu Curso], [Data], [Professor], etc. Va direto ao conteudo da tarefa. Se a tarefa EXIGIR nome, use o nome informado acima
+10. Para ANDROID: gere cada arquivo em bloco separado:
    - Codigo Java em ```java ... ``` ou Kotlin em ```kotlin ... ```
    - Layouts XML em ```xml ... ``` (activity_main.xml, etc)
    - NAO inclua AndroidManifest.xml nem build.gradle (serao gerados automaticamente)
