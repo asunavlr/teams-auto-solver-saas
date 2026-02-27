@@ -289,12 +289,12 @@ class FileSearcher:
             path=str(self.data_dir / f"shared_search_{nivel}.png")
         )
 
-        # 1. Primeiro tenta CSS para cada variacao (duplo clique para abrir)
+        # 1. Primeiro tenta CSS para cada variacao (clique no texto abre)
         for variacao in variacoes:
             try:
                 arquivo = self.page.locator(f'text=/{re.escape(variacao)}/i').first
-                await arquivo.dblclick(timeout=3000)
-                logger.info(f"Duplo clique em arquivo/pasta via CSS: {variacao}")
+                await arquivo.click(timeout=3000)
+                logger.info(f"Clique em arquivo/pasta via CSS: {variacao}")
                 await asyncio.sleep(5)  # Espera 5 segundos para preview carregar
 
                 # Verifica se abriu um arquivo ou uma pasta
@@ -316,11 +316,10 @@ class FileSearcher:
         nome_curto = variacoes[0] if variacoes else nome
 
         try:
-            # Pede pro Vision encontrar o arquivo (duplo clique para abrir)
+            # Pede pro Vision encontrar o arquivo (clique no texto abre)
             encontrou = await self.agent._clicar_com_visao(
                 f"Clique no TEXTO/NOME do arquivo '{nome_curto}' na lista de arquivos do Teams. "
-                f"Nao clique no icone, clique exatamente em cima do texto do nome do arquivo.",
-                duplo_clique=True
+                f"Nao clique no icone, clique exatamente em cima do texto do nome do arquivo."
             )
             if encontrou:
                 logger.info(f"Vision encontrou e deu duplo clique em '{nome_curto}'")
@@ -342,11 +341,10 @@ class FileSearcher:
         if nivel == 0:
             logger.info("Arquivo nao encontrado, procurando pastas...")
             try:
-                # Duplo clique para abrir a pasta
+                # Clique no texto da pasta abre
                 encontrou_pasta = await self.agent._clicar_com_visao(
                     "Uma pasta ou diretorio na lista de arquivos do Teams. "
-                    "Clique no TEXTO/NOME da pasta, nao no icone amarelo.",
-                    duplo_clique=True
+                    "Clique no TEXTO/NOME da pasta, nao no icone amarelo."
                 )
                 if encontrou_pasta:
                     logger.info("Duplo clique na pasta, aguardando 10 segundos para carregar...")
