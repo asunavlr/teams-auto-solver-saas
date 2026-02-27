@@ -366,11 +366,10 @@ def extrair_projeto_multi_arquivo(resposta: str, nome_tarefa: str, data_dir: Pat
             f.write(conteudo)
         arquivos.append(str(filepath))
 
-    if arquivos:
-        tipos = set(os.path.splitext(a)[1] for a in arquivos)
-        if len(tipos) > 1:
-            zip_path = criar_arquivo_zip(arquivos, nome_limpo, data_dir)
-            return [zip_path]
+    # Cria ZIP se houver mais de 1 arquivo (independente do tipo)
+    if len(arquivos) > 1:
+        zip_path = criar_arquivo_zip(arquivos, nome_limpo, data_dir)
+        return [zip_path]
 
     return arquivos
 

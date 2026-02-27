@@ -157,11 +157,30 @@ async def verificar_activity(browser, data_dir: Path, client_name: str = "", max
         while i < len(lines):
             line = lines[i].strip()
 
-            if "adicionou uma tarefa" in line or "atualizou uma tarefa" in line:
+            # Detecta em portugues e ingles
+            detectou_nova = (
+                "adicionou uma tarefa" in line or
+                "added an assignment" in line or
+                "posted an assignment" in line or
+                "posted a new assignment" in line
+            )
+            detectou_atualizada = (
+                "atualizou uma tarefa" in line or
+                "updated an assignment" in line
+            )
+
+            if detectou_nova or detectou_atualizada:
+                # Extrai nome do professor (antes do verbo)
+                professor = line
+                for termo in [" adicion", " atualiz", " added", " updated", " posted"]:
+                    if termo in line:
+                        professor = line.split(termo)[0].strip()
+                        break
+
                 atividade = {
                     "tipo": "assignment",
-                    "professor": line.split(" adicion")[0].split(" atualiz")[0].strip(),
-                    "acao": "nova" if "adicionou" in line else "atualizada"
+                    "professor": professor,
+                    "acao": "nova" if detectou_nova else "atualizada"
                 }
 
                 for j in range(i + 1, min(i + 5, len(lines))):
@@ -470,7 +489,7 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
                 pass
 
     if not tarefa_encontrada:
-        log(f"Tarefa nao encontrada: {nome_tarefa} (marcando como processada)", config.nome)
+        log(f"Tarefa nao encontrada: {nome_tarefa}", config.nome)
         resultado["status"] = "not_found"
         return resultado
 
