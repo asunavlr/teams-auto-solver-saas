@@ -714,12 +714,19 @@ CONTEUDO DO ARQUIVO {arquivo_externo}:
                 else:
                     log("AVISO: Nao conseguiu reabrir a tarefa", config.nome)
             else:
-                log(f"Arquivo nao encontrado: {resultado_busca.get('erro', 'erro desconhecido')}", config.nome)
-                log("Continuando apenas com instrucoes originais...", config.nome)
+                # Arquivo externo nao encontrado - nao da pra resolver a tarefa
+                log(f"Arquivo externo nao encontrado: {resultado_busca.get('erro', 'erro desconhecido')}", config.nome)
+                log("Pulando tarefa - sera tentada novamente no proximo ciclo", config.nome)
+                resultado["status"] = "skipped"
+                resultado["error"] = f"Arquivo externo nao encontrado: {arquivo_externo}"
+                return resultado
 
         except Exception as e:
             log(f"Erro ao buscar arquivo externo: {e}", config.nome)
-            log("Continuando apenas com instrucoes originais...", config.nome)
+            log("Pulando tarefa - sera tentada novamente no proximo ciclo", config.nome)
+            resultado["status"] = "skipped"
+            resultado["error"] = f"Erro ao buscar arquivo: {str(e)}"
+            return resultado
 
     # Resolve com Claude
     log("Enviando para Claude...", config.nome)

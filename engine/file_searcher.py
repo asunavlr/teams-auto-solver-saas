@@ -161,9 +161,9 @@ class FileSearcher:
                 resultado["erro"] = f"Turma nao encontrada: {disciplina}"
                 return resultado
 
-            # 3. Ir para aba Files
-            if not await self._ir_para_files():
-                resultado["erro"] = "Aba Files nao encontrada"
+            # 3. Ir para aba Shared
+            if not await self._ir_para_shared():
+                resultado["erro"] = "Aba Shared nao encontrada"
                 return resultado
 
             # 4. Buscar o arquivo
@@ -236,40 +236,37 @@ class FileSearcher:
 
         return False
 
-    async def _ir_para_files(self) -> bool:
-        """Clica na aba Files/Arquivos ou General/Shared."""
-        logger.info("Navegando para aba Files...")
+    async def _ir_para_shared(self) -> bool:
+        """Clica na aba Shared para acessar arquivos da turma."""
+        logger.info("Navegando para aba Shared...")
 
-        # Primeiro tenta clicar em General (canal padrao)
+        # Tenta clicar em "Shared" via CSS
         try:
-            general = self.page.locator('text=/General|Geral/i').first
-            await general.click(timeout=5000)
-            await asyncio.sleep(2)
-            logger.info("Entrou no canal General")
-        except Exception:
-            logger.debug("Canal General nao encontrado, continuando...")
-
-        # Tenta clicar na aba Files
-        clicked = await self.agent.clicar("files")
-        if clicked:
-            await asyncio.sleep(3)
-            return True
-
-        # Fallback: tenta clicar em "Shared" diretamente
-        try:
-            shared = self.page.locator('text=/Shared|Compartilhado/i').first
+            shared = self.page.locator('text=/^Shared$/i, [aria-label*="Shared"], button:has-text("Shared")').first
             await shared.click(timeout=5000)
             await asyncio.sleep(3)
-            logger.info("Entrou em Shared")
+            logger.info("Entrou em Shared via CSS")
             return True
         except Exception:
-            pass
+            logger.debug("CSS falhou para Shared, tentando Vision...")
+
+        # Fallback: usa Vision
+        try:
+            encontrou = await self.agent._clicar_com_visao(
+                "Aba 'Shared' no topo da pagina da turma do Teams, ao lado de 'Posts'"
+            )
+            if encontrou:
+                await asyncio.sleep(3)
+                logger.info("Entrou em Shared via Vision")
+                return True
+        except Exception as e:
+            logger.error(f"Vision falhou para Shared: {e}")
 
         return False
 
     async def _buscar_arquivo(self, nome: str, nivel: int = 0) -> bool:
         """
-        Busca arquivo por nome, navegando em pastas se necessario.
+        Busca arquivo por nome usando Vision, navegando em pastas se necessario.
 
         Args:
             nome: Nome do arquivo
@@ -278,7 +275,7 @@ class FileSearcher:
         Returns:
             True se encontrou e clicou no arquivo
         """
-        if nivel > 3:
+        if nivel > 2:
             logger.warning("Nivel maximo de busca atingido")
             return False
 
@@ -289,56 +286,68 @@ class FileSearcher:
 
         # Screenshot para debug
         await self.page.screenshot(
-            path=str(self.data_dir / f"files_search_{nivel}.png")
+            path=str(self.data_dir / f"shared_search_{nivel}.png")
         )
 
-        # Tenta cada variacao
+        # 1. Primeiro tenta CSS para cada variacao
         for variacao in variacoes:
             try:
-                # Busca elemento com o nome
                 arquivo = self.page.locator(f'text=/{re.escape(variacao)}/i').first
-
-                # Verifica se e pasta ou arquivo
-                elemento_texto = await arquivo.inner_text(timeout=3000)
-
-                # Clica no elemento
-                await arquivo.click(timeout=5000)
+                await arquivo.click(timeout=3000)
                 await asyncio.sleep(2)
+                logger.info(f"Arquivo/pasta encontrado via CSS: {variacao}")
 
-                # Se parece ser pasta (nao tem extensao), faz busca recursiva
-                if not any(ext in elemento_texto.lower() for ext in ['.pdf', '.docx', '.pptx', '.xlsx']):
-                    logger.info(f"Entrou em pasta: {variacao}")
-                    # Continua busca dentro da pasta
-                    return await self._buscar_arquivo(nome, nivel + 1)
+                # Verifica se abriu um arquivo ou uma pasta
+                # Se a URL mudou pra preview, eh arquivo
+                current_url = self.page.url
+                if "preview" in current_url.lower() or "viewer" in current_url.lower():
+                    logger.info("Arquivo aberto!")
+                    return True
 
-                logger.info(f"Arquivo encontrado: {variacao}")
-                return True
+                # Senao, pode ser pasta - busca recursivamente
+                return await self._buscar_arquivo(nome, nivel + 1)
 
-            except Exception as e:
-                logger.debug(f"Variacao '{variacao}' nao encontrada: {e}")
+            except Exception:
                 continue
 
-        # Se nao achou, tenta entrar em pastas visiveis
+        # 2. Usa Vision pra encontrar o arquivo
+        logger.info(f"CSS falhou, usando Vision para buscar '{nome}'...")
+        nome_curto = variacoes[0] if variacoes else nome
+
+        try:
+            # Pede pro Vision encontrar o arquivo
+            encontrou = await self.agent._clicar_com_visao(
+                f"Arquivo ou documento com nome parecido com '{nome_curto}' na lista de arquivos do Teams. "
+                f"Pode ser PDF, Word, PowerPoint ou pasta com esse nome."
+            )
+            if encontrou:
+                await asyncio.sleep(2)
+                logger.info(f"Vision encontrou algo relacionado a '{nome_curto}'")
+
+                # Verifica se abriu arquivo
+                current_url = self.page.url
+                if "preview" in current_url.lower() or "viewer" in current_url.lower():
+                    return True
+
+                # Pode ter aberto pasta, busca recursivamente
+                return await self._buscar_arquivo(nome, nivel + 1)
+        except Exception as e:
+            logger.debug(f"Vision nao encontrou arquivo: {e}")
+
+        # 3. Se nao encontrou arquivo, tenta encontrar qualquer pasta
         if nivel == 0:
+            logger.info("Arquivo nao encontrado, procurando pastas...")
             try:
-                # Procura por pastas comuns
-                pastas_comuns = ["Material", "Materiais", "Aulas", "Arquivos", "Documents"]
-                for pasta in pastas_comuns:
-                    try:
-                        pasta_elem = self.page.locator(f'text=/{pasta}/i').first
-                        await pasta_elem.click(timeout=3000)
-                        await asyncio.sleep(2)
-
-                        if await self._buscar_arquivo(nome, nivel + 1):
-                            return True
-
-                        # Volta (clica em back ou breadcrumb)
-                        await self.page.go_back()
-                        await asyncio.sleep(2)
-                    except Exception:
-                        continue
-            except Exception:
-                pass
+                encontrou_pasta = await self.agent._clicar_com_visao(
+                    "Uma pasta ou diretorio na lista de arquivos do Teams. "
+                    "Procure por icone de pasta amarela."
+                )
+                if encontrou_pasta:
+                    await asyncio.sleep(2)
+                    logger.info("Entrou em uma pasta, buscando arquivo dentro...")
+                    return await self._buscar_arquivo(nome, nivel + 1)
+            except Exception as e:
+                logger.debug(f"Nenhuma pasta encontrada: {e}")
 
         return False
 
