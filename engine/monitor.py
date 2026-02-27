@@ -507,12 +507,29 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
             except Exception:
                 continue
 
-        # Fallback: Vision para encontrar botao de voltar
+        # Fallback 1: Vision para encontrar botao de voltar
         if not voltou and agent:
             log("  CSS falhou, usando Vision para voltar...", config.nome)
             voltou = await agent._clicar_com_visao(
                 "Botao de voltar (seta para esquerda ou 'Back') no topo da pagina para voltar a lista de tarefas"
             )
+
+        # Fallback 2: Volta para Activity e depois clica em Assignments novamente
+        if not voltou and agent:
+            log("  Vision falhou, resetando via Activity...", config.nome)
+            if await agent.clicar("atividade"):
+                await asyncio.sleep(3)
+                # Clica em Assignments de novo
+                try:
+                    assignments_btn = browser.page.locator(
+                        'button:has-text("Assignments"), button:has-text("Atribuições"), button:has-text("Atribuicoes")'
+                    ).first
+                    await assignments_btn.click(timeout=5000)
+                    voltou = True
+                    log("  Reset via Activity funcionou!", config.nome)
+                    await asyncio.sleep(4)
+                except Exception:
+                    pass
 
         if voltou:
             await asyncio.sleep(4)
@@ -622,8 +639,28 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
         log("PDF encontrado, abrindo preview...", config.nome)
         try:
             # Encontra e clica no PDF para abrir preview
-            pdf_link = frame.locator('text=/.pdf/i').first
-            await pdf_link.click(timeout=10000)
+            pdf_abriu = False
+
+            # Tenta CSS primeiro
+            try:
+                pdf_link = frame.locator('text=/.pdf/i').first
+                await pdf_link.click(timeout=5000)
+                await asyncio.sleep(3)
+                pdf_abriu = True
+            except Exception:
+                log("  CSS falhou para PDF, tentando Vision...", config.nome)
+
+            # Fallback: Vision para clicar no PDF
+            if not pdf_abriu and agent:
+                pdf_abriu = await agent._clicar_com_visao(
+                    "Arquivo PDF na secao 'Reference materials' ou 'Materiais de referencia'. Clique no nome do arquivo PDF."
+                )
+                if pdf_abriu:
+                    await asyncio.sleep(3)
+
+            if not pdf_abriu:
+                log("  Nao conseguiu abrir o PDF", config.nome)
+                raise Exception("PDF nao abriu")
 
             # Espera o preview carregar completamente
             log("  Aguardando preview carregar...", config.nome)
@@ -635,7 +672,7 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
                 pass
 
             # Espera adicional para garantir que o conteudo renderizou
-            await asyncio.sleep(8)
+            await asyncio.sleep(10)
 
             # Verifica se ainda tem loading spinner
             try:
@@ -644,7 +681,66 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
             except Exception:
                 pass
 
-            await asyncio.sleep(2)  # Espera final
+            await asyncio.sleep(3)  # Espera final
+
+            # Verifica com Vision se o PDF realmente abriu
+            if agent:
+                screenshot = await browser.page.screenshot(type="png")
+                import base64
+                img_base64 = base64.b64encode(screenshot).decode()
+
+                # Pergunta ao Claude se o PDF está visível
+                try:
+                    from anthropic import Anthropic
+                    client = Anthropic(api_key=config.anthropic_key)
+                    response = client.messages.create(
+                        model="claude-sonnet-4-20250514",
+                        max_tokens=100,
+                        messages=[{
+                            "role": "user",
+                            "content": [
+                                {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": img_base64}},
+                                {"type": "text", "text": "O conteudo de um PDF esta visivel nesta tela? Responda apenas YES ou NO."}
+                            ]
+                        }]
+                    )
+                    pdf_visivel = "YES" in response.content[0].text.upper()
+                    log(f"  Vision verificou PDF visivel: {pdf_visivel}", config.nome)
+
+                    if not pdf_visivel:
+                        log("  PDF nao esta visivel, tentando clicar novamente...", config.nome)
+                        # Tenta clicar com Vision
+                        clicou = await agent._clicar_com_visao(
+                            "Arquivo PDF na lista de materiais de referencia. Clique no nome do arquivo PDF para abrir."
+                        )
+                        if clicou:
+                            await asyncio.sleep(10)
+                            # Verifica novamente
+                            screenshot2 = await browser.page.screenshot(type="png")
+                            img_base64_2 = base64.b64encode(screenshot2).decode()
+                            response2 = client.messages.create(
+                                model="claude-sonnet-4-20250514",
+                                max_tokens=100,
+                                messages=[{
+                                    "role": "user",
+                                    "content": [
+                                        {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": img_base64_2}},
+                                        {"type": "text", "text": "O conteudo de um PDF esta visivel nesta tela? Responda apenas YES ou NO."}
+                                    ]
+                                }]
+                            )
+                            pdf_visivel = "YES" in response2.content[0].text.upper()
+                            log(f"  Segunda verificacao: PDF visivel = {pdf_visivel}", config.nome)
+
+                        if not pdf_visivel:
+                            log("  PDF nao abriu, pulando tarefa para tentar novamente depois", config.nome)
+                            resultado["status"] = "skipped"
+                            resultado["error"] = "PDF nao abriu para leitura"
+                            return resultado
+                except Exception as e:
+                    if "PDF nao abriu" in str(e):
+                        raise
+                    log(f"  Erro na verificacao Vision: {e}", config.nome)
 
             ultimo_hash = None
             for page_num in range(1, MAX_PDF_PAGES + 1):
