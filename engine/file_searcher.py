@@ -295,18 +295,11 @@ class FileSearcher:
                 arquivo = self.page.locator(f'text=/{re.escape(variacao)}/i').first
                 await arquivo.click(timeout=3000)
                 logger.info(f"Clique em arquivo/pasta via CSS: {variacao}")
-                await asyncio.sleep(5)  # Espera 5 segundos para preview carregar
-
-                # Verifica se abriu um arquivo ou uma pasta
-                # Se a URL mudou pra preview, eh arquivo
-                current_url = self.page.url
-                logger.debug(f"URL atual: {current_url}")
-                if "preview" in current_url.lower() or "viewer" in current_url.lower():
-                    logger.info("Arquivo aberto!")
-                    return True
-
-                # Senao, pode ser pasta - busca recursivamente
-                return await self._buscar_arquivo(nome, nivel + 1)
+                logger.info("Aguardando 40 segundos para preview carregar...")
+                await asyncio.sleep(40)
+                # Assume que o arquivo abriu (URL pode nao mudar no Teams)
+                logger.info("Arquivo aberto, pronto para extrair conteudo!")
+                return True
 
             except Exception:
                 continue
@@ -322,18 +315,12 @@ class FileSearcher:
                 f"Nao clique no icone, clique exatamente em cima do texto do nome do arquivo."
             )
             if encontrou:
-                logger.info(f"Vision encontrou e deu duplo clique em '{nome_curto}'")
-                await asyncio.sleep(5)  # Espera 5 segundos para preview carregar
-
-                # Verifica se abriu arquivo
-                current_url = self.page.url
-                logger.debug(f"URL atual: {current_url}")
-                if "preview" in current_url.lower() or "viewer" in current_url.lower():
-                    logger.info("Arquivo aberto!")
-                    return True
-
-                # Pode ter aberto pasta, busca recursivamente
-                return await self._buscar_arquivo(nome, nivel + 1)
+                logger.info(f"Vision encontrou e clicou em '{nome_curto}'")
+                logger.info("Aguardando 40 segundos para preview carregar...")
+                await asyncio.sleep(40)
+                # Assume que o arquivo abriu (URL pode nao mudar no Teams)
+                logger.info("Arquivo aberto, pronto para extrair conteudo!")
+                return True
         except Exception as e:
             logger.debug(f"Vision nao encontrou arquivo: {e}")
 
@@ -347,7 +334,7 @@ class FileSearcher:
                     "Clique no TEXTO/NOME da pasta, nao no icone amarelo."
                 )
                 if encontrou_pasta:
-                    logger.info("Duplo clique na pasta, aguardando 10 segundos para carregar...")
+                    logger.info("Clicou na pasta, aguardando 10 segundos para carregar...")
                     await asyncio.sleep(10)  # Espera 10 segundos apos abrir a pasta
                     logger.info("Pasta aberta, buscando arquivo dentro...")
                     return await self._buscar_arquivo(nome, nivel + 1)
@@ -373,12 +360,18 @@ class FileSearcher:
             "tipo": None
         }
 
+        logger.info("Extraindo conteudo do arquivo...")
         await asyncio.sleep(3)
 
         # Screenshot do arquivo aberto
         ss_path = self.data_dir / "arquivo_externo_1.png"
         await self.page.screenshot(path=str(ss_path))
         resultado["screenshots"].append(str(ss_path))
+        logger.info(f"Screenshot 1 salvo: {ss_path}")
+
+        # Guarda bytes da ultima screenshot para comparar
+        with open(ss_path, "rb") as f:
+            ultima_screenshot = f.read()
 
         # Tenta extrair texto visivel
         try:
@@ -388,22 +381,47 @@ class FileSearcher:
             # Limpa e limita o texto
             texto_limpo = body_text.strip()[:5000]
             resultado["conteudo"] = texto_limpo
+            logger.info(f"Texto extraido: {len(texto_limpo)} caracteres")
 
         except Exception as e:
             logger.warning(f"Nao conseguiu extrair texto: {e}")
 
-        # Tenta fazer scroll e capturar mais paginas (para PDFs)
-        for i in range(2, 6):  # Ate 5 paginas
-            try:
-                # Scroll down
-                await self.page.keyboard.press("PageDown")
-                await asyncio.sleep(1)
+        # Faz scroll e captura mais paginas ate screenshot ser igual a anterior
+        max_paginas = 30
+        scrolls_por_pagina = 15  # Quantas setinhas pra baixo antes de cada print
 
+        for i in range(2, max_paginas + 1):
+            try:
+                # Faz 15 setinhas pra baixo
+                logger.info(f"Scrollando {scrolls_por_pagina}x para baixo...")
+                for _ in range(scrolls_por_pagina):
+                    await self.page.keyboard.press("ArrowDown")
+                    await asyncio.sleep(0.1)
+
+                await asyncio.sleep(2)  # Espera 2 segundos para carregar
+
+                # Tira screenshot
                 ss_path = self.data_dir / f"arquivo_externo_{i}.png"
                 await self.page.screenshot(path=str(ss_path))
-                resultado["screenshots"].append(str(ss_path))
 
-            except Exception:
+                # Compara com screenshot anterior
+                with open(ss_path, "rb") as f:
+                    screenshot_atual = f.read()
+
+                if screenshot_atual == ultima_screenshot:
+                    logger.info(f"Screenshot {i} igual a anterior - fim do documento")
+                    # Remove screenshot duplicado
+                    import os
+                    os.remove(ss_path)
+                    break
+
+                resultado["screenshots"].append(str(ss_path))
+                logger.info(f"Screenshot {i} salvo: {ss_path}")
+                ultima_screenshot = screenshot_atual
+
+            except Exception as e:
+                logger.warning(f"Erro ao capturar screenshot {i}: {e}")
                 break
 
+        logger.info(f"Total: {len(resultado['screenshots'])} screenshots capturados")
         return resultado

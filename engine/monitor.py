@@ -342,26 +342,35 @@ async def fechar_preview(browser):
     await asyncio.sleep(1)
 
 
-async def recuperar_frame_tarefa(browser, frame, nome_tarefa, disciplina="", agent: TeamsAgent = None):
-    """Recupera o frame de assignments se perdido."""
-    for f in browser.page.frames:
-        if "assignments" in f.url.lower():
-            return f
+async def recuperar_frame_tarefa(browser, frame, nome_tarefa, disciplina="", agent: TeamsAgent = None, reabrir_tarefa: bool = False):
+    """Recupera o frame de assignments e opcionalmente reabre a tarefa.
 
-    log("  Frame perdido, navegando de volta...")
-    assignments_btn = browser.page.locator(
-        'button:has-text("Assignments"), button:has-text("Atribuicoes"), button:has-text("Atribuições")'
-    ).first
-    await assignments_btn.click(timeout=10000)
-    await asyncio.sleep(4)
-
+    Args:
+        reabrir_tarefa: Se True, sempre clica na tarefa para reabri-la
+    """
+    # Encontra o frame de assignments
     frame = None
     for f in browser.page.frames:
         if "assignments" in f.url.lower():
             frame = f
             break
 
-    if frame:
+    if not frame:
+        log("  Frame perdido, navegando de volta...")
+        assignments_btn = browser.page.locator(
+            'button:has-text("Assignments"), button:has-text("Atribuicoes"), button:has-text("Atribuições")'
+        ).first
+        await assignments_btn.click(timeout=10000)
+        await asyncio.sleep(4)
+
+        for f in browser.page.frames:
+            if "assignments" in f.url.lower():
+                frame = f
+                break
+
+    # Se precisa reabrir a tarefa, busca e clica nela
+    if frame and reabrir_tarefa:
+        log(f"  Reabrindo tarefa: {nome_tarefa[:40]}...")
         for tab in ["Em breve", "Em atraso", "Upcoming", "Past due"]:
             try:
                 tab_btn = frame.locator(f'text="{tab}"').first
@@ -707,8 +716,8 @@ CONTEUDO DO ARQUIVO {arquivo_externo}:
                 await agent.clicar("tarefas")  # Clica em Assignments
                 await asyncio.sleep(3)
 
-                # Reabre a tarefa especifica
-                frame = await recuperar_frame_tarefa(browser, frame, nome_tarefa, disciplina, agent)
+                # Reabre a tarefa especifica (reabrir_tarefa=True força clicar na tarefa)
+                frame = await recuperar_frame_tarefa(browser, frame, nome_tarefa, disciplina, agent, reabrir_tarefa=True)
                 if frame:
                     log("Tarefa reaberta com sucesso!", config.nome)
                 else:
@@ -811,6 +820,7 @@ CONTEUDO DO ARQUIVO {arquivo_externo}:
     # Submit
     try:
         submit = frame.locator(
+            'button:has-text("Turn in again"), button:has-text("Entregar novamente"), '
             'button:has-text("Turn in late"), button:has-text("Entregar com atraso"), '
             'button:has-text("Turn in"), button:has-text("Entregar")'
         ).first
@@ -819,6 +829,7 @@ CONTEUDO DO ARQUIVO {arquivo_externo}:
 
         try:
             confirm = browser.page.locator(
+                'button:has-text("Turn in again"), button:has-text("Entregar novamente"), '
                 'button:has-text("Turn in late"), button:has-text("Entregar com atraso"), '
                 'button:has-text("Turn in"), button:has-text("Entregar")'
             ).first
@@ -903,7 +914,10 @@ async def ciclo_monitoramento_cliente(config: ClientConfig) -> dict:
         teams_email=config.teams_email,
         teams_password=config.teams_password,
     )
-    await browser.start(headless=True)
+    # Para testes locais, mude para headless=False
+    import os
+    headless = os.environ.get("HEADLESS", "true").lower() != "false"
+    await browser.start(headless=headless)
 
     # Cria agente de navegacao inteligente
     agent = TeamsAgent(browser.page, config.anthropic_key)
@@ -913,8 +927,13 @@ async def ciclo_monitoramento_cliente(config: ClientConfig) -> dict:
         log("Conectando ao Teams...", config.nome)
         update_client_status(config.client_id, "running", "Conectando ao Teams...")
         await browser.page.goto("https://teams.microsoft.com")
-        await browser.page.wait_for_load_state("networkidle")
+        log("Pagina carregada, aguardando estabilizar...", config.nome)
+        try:
+            await browser.page.wait_for_load_state("networkidle", timeout=15000)
+        except Exception:
+            log("Timeout no networkidle, continuando...", config.nome)
         await asyncio.sleep(8)
+        log("Pronto para verificar atividades...", config.nome)
 
         page_content = await browser.page.inner_text("body")
         if "Sign in" in page_content or "Entrar" in page_content:
