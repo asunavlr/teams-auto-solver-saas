@@ -318,8 +318,8 @@ class FileSearcher:
         try:
             # Pede pro Vision encontrar o arquivo (duplo clique para abrir)
             encontrou = await self.agent._clicar_com_visao(
-                f"Arquivo ou documento com nome parecido com '{nome_curto}' na lista de arquivos do Teams. "
-                f"Pode ser PDF, Word, PowerPoint ou pasta com esse nome.",
+                f"Clique no TEXTO/NOME do arquivo '{nome_curto}' na lista de arquivos do Teams. "
+                f"Nao clique no icone, clique exatamente em cima do texto do nome do arquivo.",
                 duplo_clique=True
             )
             if encontrou:
@@ -345,7 +345,7 @@ class FileSearcher:
                 # Duplo clique para abrir a pasta
                 encontrou_pasta = await self.agent._clicar_com_visao(
                     "Uma pasta ou diretorio na lista de arquivos do Teams. "
-                    "Procure por icone de pasta amarela e clique nela.",
+                    "Clique no TEXTO/NOME da pasta, nao no icone amarelo.",
                     duplo_clique=True
                 )
                 if encontrou_pasta:
