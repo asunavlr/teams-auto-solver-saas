@@ -476,23 +476,53 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
     await browser.page.screenshot(path=str(data_dir / "assignments_page.png"))
 
     # Verifica se esta dentro de uma tarefa (precisa voltar para a lista)
-    # Se encontrar botao Back/Voltar, clica para voltar a lista
-    try:
-        back_btn = frame.locator(
-            'button[aria-label*="Back"], button[aria-label*="Voltar"], '
-            'button:has-text("Back"), button:has-text("Voltar"), '
-            '[data-tid="back-button"]'
-        ).first
-        await back_btn.click(timeout=3000)
-        log("  Voltando para lista de tarefas...", config.nome)
-        await asyncio.sleep(3)
-        # Atualiza o frame apos voltar
-        for f in browser.page.frames:
-            if "assignments" in f.url.lower():
-                frame = f
+    # Detecta se esta dentro de tarefa verificando se as abas existem
+    abas_visiveis = False
+    for tab_test in ["Upcoming", "Past due", "Em breve", "Em atraso"]:
+        try:
+            tab_element = frame.locator(f'text="{tab_test}"').first
+            await tab_element.wait_for(timeout=2000, state="visible")
+            abas_visiveis = True
+            break
+        except Exception:
+            continue
+
+    if not abas_visiveis:
+        log("  Abas nao visiveis, tentando voltar para lista...", config.nome)
+        voltou = False
+
+        # Tenta CSS primeiro (frame e pagina principal)
+        for contexto in [frame, browser.page]:
+            if voltou:
                 break
-    except Exception:
-        pass  # Nao encontrou botao de voltar, ja esta na lista
+            try:
+                back_btn = contexto.locator(
+                    'button[aria-label*="Back"], button[aria-label*="Voltar"], '
+                    'button:has-text("Back"), button:has-text("Voltar"), '
+                    '[data-tid="back-button"], [aria-label*="back"]'
+                ).first
+                await back_btn.click(timeout=2000)
+                log("  Voltando via CSS...", config.nome)
+                voltou = True
+            except Exception:
+                continue
+
+        # Fallback: Vision para encontrar botao de voltar
+        if not voltou and agent:
+            log("  CSS falhou, usando Vision para voltar...", config.nome)
+            voltou = await agent._clicar_com_visao(
+                "Botao de voltar (seta para esquerda ou 'Back') no topo da pagina para voltar a lista de tarefas"
+            )
+
+        if voltou:
+            await asyncio.sleep(4)
+            # Atualiza o frame apos voltar
+            for f in browser.page.frames:
+                if "assignments" in f.url.lower():
+                    frame = f
+                    break
+            # Screenshot apos voltar
+            await browser.page.screenshot(path=str(data_dir / "after_back.png"))
 
     # Busca em cada aba
     tarefa_encontrada = False
