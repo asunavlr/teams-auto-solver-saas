@@ -123,28 +123,48 @@ def executar_cliente(self, client_id: int):
             tasks_success = 0
             tasks_error = 0
 
-            for task in resultado.get("tasks", []):
-                # Salva log
-                task_log = TaskLog(
-                    client_id=client_id,
-                    task_name=task.get("name", ""),
-                    discipline=task.get("discipline", ""),
-                    format=task.get("format", ""),
-                    status=task.get("status", "error"),
-                    error_msg=task.get("error", ""),
-                )
-                db.session.add(task_log)
+            # Limpa qualquer transacao pendente antes de salvar
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
 
-                # Conta e incrementa
-                if task.get("status") == "success":
-                    client.incrementar_tarefa()
-                    tasks_success += 1
-                elif task.get("status") == "error":
-                    tasks_error += 1
+            for task in resultado.get("tasks", []):
+                try:
+                    # Salva log
+                    task_log = TaskLog(
+                        client_id=client_id,
+                        task_name=task.get("name", ""),
+                        discipline=task.get("discipline", ""),
+                        format=task.get("format", ""),
+                        status=task.get("status", "error"),
+                        error_msg=task.get("error", ""),
+                    )
+                    db.session.add(task_log)
+
+                    # Conta e incrementa
+                    if task.get("status") == "success":
+                        client.incrementar_tarefa()
+                        tasks_success += 1
+                    elif task.get("status") == "error":
+                        tasks_error += 1
+                except Exception as e:
+                    logger.error(f"Erro ao salvar log da tarefa: {e}")
+                    try:
+                        db.session.rollback()
+                    except Exception:
+                        pass
 
             # Atualiza ultimo check
-            client.last_check = datetime.utcnow()
-            db.session.commit()
+            try:
+                client.last_check = datetime.utcnow()
+                db.session.commit()
+            except Exception as e:
+                logger.error(f"Erro ao fazer commit: {e}")
+                try:
+                    db.session.rollback()
+                except Exception:
+                    pass
 
             # Status final
             if tasks_error > 0:
