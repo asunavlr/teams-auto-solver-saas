@@ -117,7 +117,7 @@ export function ClientDetailPage() {
   const { data: processadas } = useQuery({
     queryKey: ["processadas", id],
     queryFn: async () => {
-      const res = await api.get<{ items: { id: string }[]; total: number }>(`/clients/${id}/processadas`)
+      const res = await api.get<{ items: { id: string; nome: string; disciplina: string }[]; total: number }>(`/clients/${id}/processadas`)
       return res.data
     },
     enabled: !!id,
@@ -682,7 +682,8 @@ export function ClientDetailPage() {
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="pl-6">ID da Atividade</TableHead>
+                      <TableHead className="pl-6">Atividade</TableHead>
+                      <TableHead>Disciplina</TableHead>
                       <TableHead className="pr-6 w-[100px]"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -690,9 +691,19 @@ export function ClientDetailPage() {
                     {processadas.items.map((item) => (
                       <TableRow key={item.id}>
                         <TableCell className="pl-6">
-                          <code className="text-xs bg-muted px-2 py-1 rounded break-all">
-                            {item.id}
-                          </code>
+                          <div>
+                            <p className="text-sm font-medium">
+                              {item.nome || <span className="text-muted-foreground italic">Sem nome</span>}
+                            </p>
+                            <code className="text-[10px] text-muted-foreground">
+                              {item.id.substring(0, 12)}...
+                            </code>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-xs text-muted-foreground">
+                            {item.disciplina || "-"}
+                          </span>
                         </TableCell>
                         <TableCell className="pr-6">
                           <Button
@@ -703,7 +714,6 @@ export function ClientDetailPage() {
                             disabled={deleteProcessada.isPending}
                           >
                             <X className="h-4 w-4" />
-                            Remover
                           </Button>
                         </TableCell>
                       </TableRow>

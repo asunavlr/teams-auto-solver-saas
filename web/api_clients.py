@@ -418,10 +418,20 @@ def get_processadas(client_id):
 
     try:
         with open(processadas_path, "r") as f:
-            processadas = json.load(f)
+            data = json.load(f)
 
-        # Retorna lista de objetos com id
-        items = [{"id": pid, "client_id": client_id} for pid in processadas]
+        # Compatibilidade: lista antiga ou dict novo
+        if isinstance(data, list):
+            items = [{"id": pid, "nome": "", "disciplina": ""} for pid in data]
+        else:
+            items = [
+                {
+                    "id": pid,
+                    "nome": info.get("nome", ""),
+                    "disciplina": info.get("disciplina", ""),
+                }
+                for pid, info in data.items()
+            ]
 
         return jsonify({
             "items": items,

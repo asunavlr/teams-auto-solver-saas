@@ -73,16 +73,22 @@ def log(msg: str, client_name: str = ""):
     logger.info(f"{prefix}{msg}")
 
 
-def carregar_processadas(path: Path) -> set:
+def carregar_processadas(path: Path) -> dict:
+    """Carrega atividades processadas. Retorna dict {id: {nome, disciplina}}."""
     if path.exists():
         with open(path, "r") as f:
-            return set(json.load(f))
-    return set()
+            data = json.load(f)
+            # Compatibilidade: se for lista antiga, converte pra dict
+            if isinstance(data, list):
+                return {id: {"nome": "", "disciplina": ""} for id in data}
+            return data
+    return {}
 
 
-def salvar_processadas(processadas: set, path: Path):
+def salvar_processadas(processadas: dict, path: Path):
+    """Salva atividades processadas como dict {id: {nome, disciplina}}."""
     with open(path, "w") as f:
-        json.dump(list(processadas), f)
+        json.dump(processadas, f, ensure_ascii=False, indent=2)
 
 
 async def verificar_activity(browser, data_dir: Path, client_name: str = "", max_tentativas: int = 3, agent: TeamsAgent = None) -> list:
@@ -904,7 +910,10 @@ async def ciclo_monitoramento_cliente(config: ClientConfig) -> dict:
 
                     # Marca como processada se não for erro
                     if res["status"] != "error":
-                        processadas.add(atividade["id"])
+                        processadas[atividade["id"]] = {
+                            "nome": atividade.get("nome", ""),
+                            "disciplina": atividade.get("disciplina", ""),
+                        }
                         salvar_processadas(processadas, config.processadas_path)
 
                     task_result = {
