@@ -392,17 +392,27 @@ class FileSearcher:
 
         for i in range(2, max_paginas + 1):
             try:
-                # Faz 15 setinhas pra baixo
+                # Faz 15 setinhas pra baixo com timeout
                 logger.info(f"Scrollando {scrolls_por_pagina}x para baixo...")
-                for _ in range(scrolls_por_pagina):
-                    await self.page.keyboard.press("ArrowDown")
-                    await asyncio.sleep(0.1)
+                try:
+                    async with asyncio.timeout(30):  # Timeout de 30s para scroll
+                        for _ in range(scrolls_por_pagina):
+                            await self.page.keyboard.press("ArrowDown")
+                            await asyncio.sleep(0.1)
+                except asyncio.TimeoutError:
+                    logger.warning(f"Timeout no scroll da pagina {i}")
+                    break
 
                 await asyncio.sleep(2)  # Espera 2 segundos para carregar
 
-                # Tira screenshot
+                # Tira screenshot com timeout
                 ss_path = self.data_dir / f"arquivo_externo_{i}.png"
-                await self.page.screenshot(path=str(ss_path))
+                try:
+                    async with asyncio.timeout(30):  # Timeout de 30s para screenshot
+                        await self.page.screenshot(path=str(ss_path))
+                except asyncio.TimeoutError:
+                    logger.warning(f"Timeout no screenshot {i}")
+                    break
 
                 # Compara com screenshot anterior
                 with open(ss_path, "rb") as f:
