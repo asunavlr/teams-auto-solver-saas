@@ -473,11 +473,14 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
 
     # Busca em cada aba
     tarefa_encontrada = False
+    abas_tentadas = 0
     for tab in ["Em breve", "Em atraso", "Upcoming", "Past due", "Assigned", "Atribuído"]:
         if not tarefa_encontrada:
             try:
                 tab_btn = frame.locator(f'text="{tab}"').first
                 await tab_btn.click(timeout=5000)
+                abas_tentadas += 1
+                log(f"  Aba '{tab}' clicada, buscando tarefa...", config.nome)
                 await asyncio.sleep(3)
 
                 if nome_tarefa and await buscar_tarefa_no_frame(frame, nome_tarefa, disciplina, agent):
@@ -485,8 +488,25 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
                     log(f"  Tarefa encontrada em {tab}!", config.nome)
                     tarefa_encontrada = True
                     break
-            except Exception:
-                pass
+                else:
+                    log(f"  Tarefa nao encontrada na aba '{tab}'", config.nome)
+            except Exception as e:
+                log(f"  Erro na aba '{tab}': {str(e)[:50]}", config.nome)
+
+    # Se nenhuma aba foi clicada com sucesso, tenta buscar direto com Vision
+    if not tarefa_encontrada and abas_tentadas == 0 and agent:
+        log("Nenhuma aba encontrada, tentando Vision direto...", config.nome)
+        nome_curto = " ".join(nome_tarefa.split()[:5])
+        try:
+            encontrou = await agent._clicar_com_visao(
+                f"Tarefa ou assignment com nome '{nome_curto}' na lista de tarefas do Teams"
+            )
+            if encontrou:
+                await asyncio.sleep(4)
+                log("  Tarefa encontrada via Vision!", config.nome)
+                tarefa_encontrada = True
+        except Exception as e:
+            log(f"  Vision falhou: {e}", config.nome)
 
     if not tarefa_encontrada:
         log(f"Tarefa nao encontrada: {nome_tarefa}", config.nome)
@@ -655,7 +675,7 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
                 # Encontra e clica no documento para abrir preview
                 doc_link = frame.locator(f'text=/{re.escape(ext)}/i').first
                 await doc_link.click(timeout=10000)
-                await asyncio.sleep(4)  # Espera o preview carregar
+                await asyncio.sleep(10)  # Espera o preview carregar
 
                 # Tira screenshots do preview (ate 10 paginas)
                 max_doc_pages = 10
