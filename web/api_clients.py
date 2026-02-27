@@ -39,6 +39,10 @@ def client_to_dict(client: Client, include_logs: bool = False) -> dict:
         "tarefas_mes": client.tarefas_mes,
         "limite_tarefas": client.limite_tarefas,
         "uso_percentual": client.uso_percentual,
+        # Trial
+        "is_trial": client.is_trial,
+        "used_trial": client.used_trial,
+        "can_use_trial": client.can_use_trial,
         # Runtime
         "runtime_status": status_info.status if status_info else "idle",
         "current_action": status_info.current_action if status_info else "",
@@ -367,6 +371,31 @@ def renew_client(client_id):
         pass
 
     return jsonify(client_to_dict(client))
+
+
+# ============================================
+# ACTIVATE TRIAL
+# ============================================
+
+@api_clients_bp.route("/<int:client_id>/trial", methods=["POST"])
+@jwt_or_session_required
+def activate_trial(client_id):
+    """Ativa plano trial para o cliente (apenas 1x por cliente)."""
+    client = Client.query.get_or_404(client_id)
+
+    if client.used_trial:
+        return jsonify({"error": "Cliente ja utilizou o trial"}), 400
+
+    if client.activate_trial():
+        # Agendar no scheduler
+        try:
+            from engine.scheduler import agendar_cliente
+            agendar_cliente(client)
+        except Exception:
+            pass
+        return jsonify(client_to_dict(client))
+    else:
+        return jsonify({"error": "Nao foi possivel ativar o trial"}), 400
 
 
 # ============================================

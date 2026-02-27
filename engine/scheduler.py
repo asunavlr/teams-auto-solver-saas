@@ -37,6 +37,8 @@ def _get_app_context():
 def _build_client_config(client):
     """Constroi ClientConfig a partir do modelo do banco."""
     from engine.monitor import ClientConfig
+    # Garante contador atualizado
+    client.verificar_reset_mensal()
     return ClientConfig(
         client_id=client.id,
         nome=client.nome,
@@ -49,6 +51,8 @@ def _build_client_config(client):
         smtp_password=client.smtp_password,
         notification_email=client.notification_email,
         whatsapp=getattr(client, 'whatsapp', ''),
+        limite_tarefas=client.limite_tarefas,
+        tarefas_mes=client.tarefas_mes,
     )
 
 

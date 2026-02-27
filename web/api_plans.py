@@ -20,4 +20,6 @@ def list_plans():
         "preco_mensal": p.preco_mensal,
         "preco_semestral": p.preco_semestral,
         "limite_tarefas": p.limite_tarefas,
+        "is_trial": p.is_trial,
+        "duracao_dias": p.duracao_dias,
     } for p in plans])

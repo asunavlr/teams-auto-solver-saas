@@ -102,6 +102,9 @@ def executar_cliente(self, client_id: int):
             # Importa e executa o ciclo de monitoramento
             from engine.monitor import ciclo_monitoramento_cliente, ClientConfig
 
+            # Garante contador atualizado
+            client.verificar_reset_mensal()
+
             config = ClientConfig(
                 client_id=client.id,
                 nome=client.nome,
@@ -114,6 +117,8 @@ def executar_cliente(self, client_id: int):
                 whatsapp=client.whatsapp,
                 check_interval=client.check_interval,
                 data_dir=client.data_dir,
+                limite_tarefas=client.limite_tarefas,
+                tarefas_mes=client.tarefas_mes,
             )
 
             # Executa o ciclo (async)

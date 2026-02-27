@@ -224,6 +224,17 @@ export function ClientDetailPage() {
     onError: () => toast.error("Erro ao excluir cliente"),
   })
 
+  // ── Mutation: activate trial ──
+  const activateTrial = useMutation({
+    mutationFn: () => api.post(`/clients/${id}/trial`),
+    onSuccess: () => {
+      toast.success("Trial ativado com sucesso! 3 tarefas por 7 dias.")
+      queryClient.invalidateQueries({ queryKey: ["client", id] })
+      queryClient.invalidateQueries({ queryKey: ["clients"] })
+    },
+    onError: () => toast.error("Erro ao ativar trial"),
+  })
+
   // ── Renew form ──
   const renewForm = useForm<RenewFormValues>({
     resolver: zodResolver(renewSchema) as any,
@@ -360,16 +371,31 @@ export function ClientDetailPage() {
           <CardContent>
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-500/10">
-                  <Crown className="h-5 w-5 text-indigo-500" />
+                <div className={cn(
+                  "flex h-10 w-10 items-center justify-center rounded-lg",
+                  client.is_trial ? "bg-emerald-500/10" : "bg-indigo-500/10"
+                )}>
+                  <Crown className={cn("h-5 w-5", client.is_trial ? "text-emerald-500" : "text-indigo-500")} />
                 </div>
                 <div>
-                  <p className="text-sm font-medium">
-                    {client.plan_name ?? "Sem plano"}
-                  </p>
-                  {client.plan_price != null && (
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium">
+                      {client.plan_name ?? "Sem plano"}
+                    </p>
+                    {client.is_trial && (
+                      <Badge variant="secondary" className="text-[10px] bg-emerald-500/10 text-emerald-500">
+                        Trial - 7 dias
+                      </Badge>
+                    )}
+                  </div>
+                  {client.plan_price != null && client.plan_price > 0 && (
                     <p className="text-xs text-muted-foreground">
                       {formatCurrency(client.plan_price)}/mes
+                    </p>
+                  )}
+                  {client.is_trial && (
+                    <p className="text-xs text-muted-foreground">
+                      Gratuito - {client.limite_tarefas} tarefas
                     </p>
                   )}
                 </div>
@@ -453,6 +479,23 @@ export function ClientDetailPage() {
           <RefreshCw className="h-4 w-4" />
           Renovar
         </Button>
+
+        {client.can_use_trial && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-emerald-500 hover:text-emerald-500 hover:bg-emerald-500/10"
+            disabled={activateTrial.isPending}
+            onClick={() => activateTrial.mutate()}
+          >
+            {activateTrial.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Play className="h-4 w-4" />
+            )}
+            Ativar Trial
+          </Button>
+        )}
 
         <Button
           variant="outline"

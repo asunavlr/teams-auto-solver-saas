@@ -30,16 +30,19 @@ class Plan(db.Model):
     __tablename__ = "plans"
 
     id = db.Column(db.Integer, primary_key=True)
-    nome = db.Column(db.String(50), nullable=False)  # Básico, Premium, Ilimitado
+    nome = db.Column(db.String(50), nullable=False)  # Trial, Básico, Premium, Ilimitado
     preco_mensal = db.Column(db.Float, nullable=False)
     preco_semestral = db.Column(db.Float, nullable=False)
     limite_tarefas = db.Column(db.Integer, nullable=True)  # None = ilimitado
+    is_trial = db.Column(db.Boolean, default=False)  # Trial não reseta mensalmente
+    duracao_dias = db.Column(db.Integer, nullable=True)  # Duração fixa (para trial)
     ativo = db.Column(db.Boolean, default=True)
 
     @classmethod
     def seed_plans(cls):
         """Cria planos padrão se não existirem."""
         plans_data = [
+            {"nome": "Trial", "preco_mensal": 0, "preco_semestral": 0, "limite_tarefas": 3, "is_trial": True, "duracao_dias": 7},
             {"nome": "Básico", "preco_mensal": 60, "preco_semestral": 300, "limite_tarefas": 60},
             {"nome": "Premium", "preco_mensal": 100, "preco_semestral": 500, "limite_tarefas": 120},
             {"nome": "Ilimitado", "preco_mensal": 150, "preco_semestral": 750, "limite_tarefas": None},
@@ -74,13 +77,17 @@ class Client(db.Model):
     plan_id = db.Column(db.Integer, db.ForeignKey("plans.id"), nullable=True)
     tarefas_mes = db.Column(db.Integer, default=0)  # Contador do mês atual
     mes_contagem = db.Column(db.Integer, default=0)  # Mês do contador (1-12)
+    used_trial = db.Column(db.Boolean, default=False)  # Já usou trial
 
     plan = db.relationship("Plan", backref="clients")
     task_logs = db.relationship("TaskLog", backref="client", lazy="dynamic")
     payments = db.relationship("Payment", backref="client", lazy="dynamic")
 
     def verificar_reset_mensal(self):
-        """Reseta contador se mudou o mês."""
+        """Reseta contador se mudou o mês (exceto para trial)."""
+        # Trial não reseta - limite é total, não mensal
+        if self.plan and self.plan.is_trial:
+            return
         mes_atual = datetime.utcnow().month
         if self.mes_contagem != mes_atual:
             self.tarefas_mes = 0
@@ -158,6 +165,16 @@ class Client(db.Model):
         return self.expires_at <= datetime.utcnow()
 
     @property
+    def is_trial(self):
+        """Verifica se está no plano trial."""
+        return self.plan and self.plan.is_trial
+
+    @property
+    def can_use_trial(self):
+        """Verifica se pode usar trial (nunca usou antes)."""
+        return not self.used_trial
+
+    @property
     def days_remaining(self):
         delta = self.expires_at - datetime.utcnow()
         return max(0, delta.days)
@@ -172,6 +189,21 @@ class Client(db.Model):
         base = max(self.expires_at, datetime.utcnow())
         self.expires_at = base + timedelta(days=30 * months)
         self.status = "active"
+
+    def activate_trial(self):
+        """Ativa o plano trial para o cliente. Retorna True se sucesso, False se já usou."""
+        if self.used_trial:
+            return False
+        trial_plan = Plan.query.filter_by(is_trial=True).first()
+        if not trial_plan:
+            return False
+        self.plan_id = trial_plan.id
+        self.used_trial = True
+        self.tarefas_mes = 0  # Reseta contador
+        self.expires_at = datetime.utcnow() + timedelta(days=trial_plan.duracao_dias or 7)
+        self.status = "active"
+        db.session.commit()
+        return True
 
 
 class TaskLog(db.Model):

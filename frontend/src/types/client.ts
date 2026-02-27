@@ -21,6 +21,10 @@ export interface Client {
   tarefas_mes: number
   limite_tarefas: number | null
   uso_percentual: number
+  // Trial
+  is_trial: boolean
+  used_trial: boolean
+  can_use_trial: boolean
   runtime_status: "idle" | "running" | "error"
   current_action: string
   // Campos extras no detalhe
@@ -51,6 +55,8 @@ export interface Plan {
   preco_mensal: number
   preco_semestral: number
   limite_tarefas: number | null
+  is_trial?: boolean
+  duracao_dias?: number | null
 }
 
 export interface Payment {

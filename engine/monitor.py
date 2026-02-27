@@ -42,7 +42,8 @@ class ClientConfig:
                  teams_password: str, anthropic_key: str,
                  data_dir: Path, check_interval: int = 60,
                  smtp_email: str = "", smtp_password: str = "",
-                 notification_email: str = "", whatsapp: str = ""):
+                 notification_email: str = "", whatsapp: str = "",
+                 limite_tarefas: int = None, tarefas_mes: int = 0):
         self.client_id = client_id
         self.nome = nome
         self.teams_email = teams_email
@@ -54,6 +55,8 @@ class ClientConfig:
         self.smtp_password = smtp_password
         self.notification_email = notification_email
         self.whatsapp = whatsapp
+        self.limite_tarefas = limite_tarefas  # None = ilimitado
+        self.tarefas_mes = tarefas_mes  # Contador atual
 
         # Garante que o diretorio existe
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -1006,7 +1009,18 @@ async def ciclo_monitoramento_cliente(config: ClientConfig) -> dict:
         else:
             log(f"{len(novas)} atividade(s) nova(s)", config.nome)
 
+            # Contador de tarefas processadas neste ciclo
+            tarefas_processadas_ciclo = 0
+
             for atividade in novas:
+                # Verifica limite antes de processar cada atividade
+                if config.limite_tarefas is not None:
+                    tarefas_total = config.tarefas_mes + tarefas_processadas_ciclo
+                    if tarefas_total >= config.limite_tarefas:
+                        log(f"Limite de tarefas atingido ({tarefas_total}/{config.limite_tarefas}), parando ciclo", config.nome)
+                        update_client_status(config.client_id, "idle", f"Limite atingido: {tarefas_total}/{config.limite_tarefas}")
+                        break
+
                 nome_tarefa = atividade.get("nome", "")[:50]
                 atividade_id = atividade["id"]
                 update_client_status(config.client_id, "running", f"Processando: {nome_tarefa}...")
@@ -1057,9 +1071,10 @@ async def ciclo_monitoramento_cliente(config: ClientConfig) -> dict:
 
                     if res["status"] == "success":
                         resultado["success"] += 1
+                        tarefas_processadas_ciclo += 1  # Conta para o limite
                     elif res["status"] == "error":
                         resultado["error"] += 1
-                    # skipped, not_found, group não contam como erro
+                    # skipped, not_found, group não contam como erro nem para o limite
 
                 except Exception as e:
                     log(f"Erro ao processar: {e}", config.nome)
