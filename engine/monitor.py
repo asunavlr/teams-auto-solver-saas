@@ -91,6 +91,25 @@ def salvar_processadas(processadas: dict, path: Path):
         json.dump(processadas, f, ensure_ascii=False, indent=2)
 
 
+def carregar_tentativas_falhas(path: Path) -> dict:
+    """Carrega contador de tentativas falhas. Retorna dict {id: tentativas}."""
+    falhas_path = path.parent / "tentativas_falhas.json"
+    if falhas_path.exists():
+        with open(falhas_path, "r") as f:
+            return json.load(f)
+    return {}
+
+
+def salvar_tentativas_falhas(tentativas: dict, path: Path):
+    """Salva contador de tentativas falhas."""
+    falhas_path = path.parent / "tentativas_falhas.json"
+    with open(falhas_path, "w") as f:
+        json.dump(tentativas, f, ensure_ascii=False, indent=2)
+
+
+MAX_TENTATIVAS_NOT_FOUND = 3  # Quantas vezes tentar antes de marcar como processada
+
+
 async def verificar_activity(browser, data_dir: Path, client_name: str = "", max_tentativas: int = 3, agent: TeamsAgent = None) -> list:
     """Verifica a aba Activity e retorna novas atividades.
 
@@ -189,8 +208,11 @@ async def verificar_activity(browser, data_dir: Path, client_name: str = "", max
     return []
 
 
-async def buscar_tarefa_no_frame(frame, nome_tarefa: str, disciplina: str = "") -> bool:
-    """Busca e clica na tarefa pelo nome, considerando a disciplina se fornecida."""
+async def buscar_tarefa_no_frame(frame, nome_tarefa: str, disciplina: str = "", agent: TeamsAgent = None) -> bool:
+    """Busca e clica na tarefa pelo nome, considerando a disciplina se fornecida.
+
+    Se CSS falhar e agent estiver disponivel, usa Vision como fallback.
+    """
     nome_limpo = re.sub(r'[()\\/*+?\[\]{}|^$.]', '', nome_tarefa).strip()
 
     # Se tem disciplina, tenta encontrar a tarefa que está associada a ela
@@ -252,6 +274,20 @@ async def buscar_tarefa_no_frame(frame, nome_tarefa: str, disciplina: str = "") 
         except Exception:
             continue
 
+    # Fallback: usa Vision se agent disponivel
+    if agent:
+        logger.warning(f"CSS nao encontrou tarefa '{nome_tarefa}', usando Vision")
+        try:
+            # Pega primeiras palavras do nome para o prompt
+            nome_curto = " ".join(nome_tarefa.split()[:5])
+            encontrou = await agent._clicar_com_visao(
+                f"Tarefa ou assignment com nome '{nome_curto}' na lista de tarefas"
+            )
+            if encontrou:
+                return True
+        except Exception as e:
+            logger.error(f"Vision tambem falhou: {e}")
+
     return False
 
 
@@ -306,7 +342,7 @@ async def fechar_preview(browser):
     await asyncio.sleep(1)
 
 
-async def recuperar_frame_tarefa(browser, frame, nome_tarefa, disciplina=""):
+async def recuperar_frame_tarefa(browser, frame, nome_tarefa, disciplina="", agent: TeamsAgent = None):
     """Recupera o frame de assignments se perdido."""
     for f in browser.page.frames:
         if "assignments" in f.url.lower():
@@ -331,7 +367,7 @@ async def recuperar_frame_tarefa(browser, frame, nome_tarefa, disciplina=""):
                 tab_btn = frame.locator(f'text="{tab}"').first
                 await tab_btn.click(timeout=5000)
                 await asyncio.sleep(2)
-                if await buscar_tarefa_no_frame(frame, nome_tarefa, disciplina):
+                if await buscar_tarefa_no_frame(frame, nome_tarefa, disciplina, agent):
                     await asyncio.sleep(4)
                     break
             except Exception:
@@ -340,7 +376,7 @@ async def recuperar_frame_tarefa(browser, frame, nome_tarefa, disciplina=""):
     return frame
 
 
-async def processar_nova_atividade(browser, atividade: dict, config: ClientConfig) -> dict:
+async def processar_nova_atividade(browser, atividade: dict, config: ClientConfig, agent: TeamsAgent = None) -> dict:
     """Processa uma nova atividade para um cliente.
 
     Retorna dict com:
@@ -416,7 +452,7 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
                 await tab_btn.click(timeout=5000)
                 await asyncio.sleep(3)
 
-                if nome_tarefa and await buscar_tarefa_no_frame(frame, nome_tarefa, disciplina):
+                if nome_tarefa and await buscar_tarefa_no_frame(frame, nome_tarefa, disciplina, agent):
                     await asyncio.sleep(4)
                     log(f"  Tarefa encontrada em {tab}!", config.nome)
                     tarefa_encontrada = True
@@ -540,7 +576,7 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
                     break
 
             await fechar_preview(browser)
-            frame = await recuperar_frame_tarefa(browser, frame, nome_tarefa, disciplina)
+            frame = await recuperar_frame_tarefa(browser, frame, nome_tarefa, disciplina, agent)
         except Exception as e:
             log(f"  Erro ao processar PDF: {e}", config.nome)
             # Tenta fechar qualquer preview aberto
@@ -570,7 +606,7 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
                         break
             except Exception:
                 pass
-        frame = await recuperar_frame_tarefa(browser, frame, nome_tarefa, disciplina)
+        frame = await recuperar_frame_tarefa(browser, frame, nome_tarefa, disciplina, agent)
 
     # Processa documentos anexados (abre preview e tira screenshots, como PDF)
     tem_docx_anexo = any(ext in content_lower for ext in [".docx", ".doc"])
@@ -625,7 +661,7 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
 
                 # Fecha o preview
                 await fechar_preview(browser)
-                frame = await recuperar_frame_tarefa(browser, frame, nome_tarefa, disciplina)
+                frame = await recuperar_frame_tarefa(browser, frame, nome_tarefa, disciplina, agent)
 
             except Exception as e:
                 log(f"  Erro ao processar documento {ext}: {e}", config.nome)
@@ -635,7 +671,7 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
                 except Exception:
                     pass
 
-        frame = await recuperar_frame_tarefa(browser, frame, nome_tarefa, disciplina)
+        frame = await recuperar_frame_tarefa(browser, frame, nome_tarefa, disciplina, agent)
 
     # Verifica se instrucoes referenciam arquivo externo
     arquivo_externo = detectar_arquivo_externo(tarefa_info.get("instrucoes", ""))
@@ -672,7 +708,7 @@ CONTEUDO DO ARQUIVO {arquivo_externo}:
                 await asyncio.sleep(3)
 
                 # Reabre a tarefa especifica
-                frame = await recuperar_frame_tarefa(browser, frame, nome_tarefa, disciplina)
+                frame = await recuperar_frame_tarefa(browser, frame, nome_tarefa, disciplina, agent)
                 if frame:
                     log("Tarefa reaberta com sucesso!", config.nome)
                 else:
@@ -896,6 +932,9 @@ async def ciclo_monitoramento_cliente(config: ClientConfig) -> dict:
         atividades = await verificar_activity(browser, config.data_dir, config.nome, agent=agent)
         novas = [a for a in atividades if a.get("id") not in processadas]
 
+        # Carrega contador de tentativas falhas
+        tentativas_falhas = carregar_tentativas_falhas(config.processadas_path)
+
         if not novas:
             log("Nenhuma atividade nova!", config.nome)
             update_client_status(config.client_id, "idle", "Nenhuma atividade nova")
@@ -904,17 +943,43 @@ async def ciclo_monitoramento_cliente(config: ClientConfig) -> dict:
 
             for atividade in novas:
                 nome_tarefa = atividade.get("nome", "")[:50]
+                atividade_id = atividade["id"]
                 update_client_status(config.client_id, "running", f"Processando: {nome_tarefa}...")
                 try:
-                    res = await processar_nova_atividade(browser, atividade, config)
+                    res = await processar_nova_atividade(browser, atividade, config, agent)
 
-                    # Marca como processada se não for erro
-                    if res["status"] != "error":
-                        processadas[atividade["id"]] = {
+                    # Lógica de marcação como processada
+                    if res["status"] == "not_found":
+                        # Incrementa contador de tentativas falhas
+                        tentativas_falhas[atividade_id] = tentativas_falhas.get(atividade_id, 0) + 1
+                        tentativas = tentativas_falhas[atividade_id]
+
+                        if tentativas >= MAX_TENTATIVAS_NOT_FOUND:
+                            # Atingiu limite, marca como processada
+                            log(f"Atividade nao encontrada {tentativas}x, marcando como processada", config.nome)
+                            processadas[atividade_id] = {
+                                "nome": atividade.get("nome", ""),
+                                "disciplina": atividade.get("disciplina", ""),
+                            }
+                            salvar_processadas(processadas, config.processadas_path)
+                            # Remove do contador
+                            del tentativas_falhas[atividade_id]
+                        else:
+                            log(f"Atividade nao encontrada (tentativa {tentativas}/{MAX_TENTATIVAS_NOT_FOUND}), vai tentar novamente", config.nome)
+
+                        salvar_tentativas_falhas(tentativas_falhas, config.processadas_path)
+
+                    elif res["status"] != "error":
+                        # Sucesso, skipped, group - marca como processada
+                        processadas[atividade_id] = {
                             "nome": atividade.get("nome", ""),
                             "disciplina": atividade.get("disciplina", ""),
                         }
                         salvar_processadas(processadas, config.processadas_path)
+                        # Remove do contador de falhas se existia
+                        if atividade_id in tentativas_falhas:
+                            del tentativas_falhas[atividade_id]
+                            salvar_tentativas_falhas(tentativas_falhas, config.processadas_path)
 
                     task_result = {
                         "name": atividade.get("nome", ""),
