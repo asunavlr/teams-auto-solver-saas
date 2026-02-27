@@ -880,7 +880,8 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
             searcher = FileSearcher(browser, agent, data_dir)
             resultado_busca = await searcher.buscar_arquivo(
                 nome_arquivo=arquivo_externo,
-                disciplina=disciplina
+                disciplina=disciplina,
+                instrucoes=tarefa_info.get("instrucoes", "")
             )
 
             if resultado_busca["encontrado"]:

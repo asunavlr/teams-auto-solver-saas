@@ -122,7 +122,8 @@ class FileSearcher:
     async def buscar_arquivo(
         self,
         nome_arquivo: str,
-        disciplina: str
+        disciplina: str,
+        instrucoes: str = ""
     ) -> dict:
         """
         Busca arquivo na turma e retorna conteudo.
@@ -130,6 +131,7 @@ class FileSearcher:
         Args:
             nome_arquivo: Nome do arquivo a buscar
             disciplina: Nome da disciplina/turma
+            instrucoes: Instrucoes da tarefa (para decidir se procura exercicios)
 
         Returns:
             {
@@ -141,6 +143,19 @@ class FileSearcher:
             }
         """
         logger.info(f"Buscando arquivo '{nome_arquivo}' na turma '{disciplina}'")
+
+        # Decide se deve procurar exercicios no arquivo
+        instrucoes_lower = instrucoes.lower()
+        self._procurar_exercicios = any(frase in instrucoes_lower for frase in [
+            "no final", "última página", "ultima pagina", "últimas páginas",
+            "exercícios no", "exercicios no", "lista no final",
+            "questões no", "questoes no", "atividade no final"
+        ])
+
+        if self._procurar_exercicios:
+            logger.info("Instrucoes indicam exercicios no arquivo - vai procurar com Vision")
+        else:
+            logger.info("Arquivo eh material de referencia - vai capturar do inicio")
 
         resultado = {
             "encontrado": False,
@@ -377,57 +392,88 @@ class FileSearcher:
         except Exception as e:
             logger.warning(f"Nao conseguiu extrair texto: {e}")
 
-        # FASE 1: Procura onde estao os exercicios
-        logger.info("Fase 1: Procurando exercicios no documento...")
-        max_buscas = 20  # Maximo de verificacoes (20 * 15 scrolls = ~300 scrolls)
-        scrolls_por_busca = 15
-        encontrou_exercicios = False
-        client = Anthropic(api_key=self.agent.client.api_key)
+        # FASE 1: Procura onde estao os exercicios (se necessario)
+        procurar = getattr(self, '_procurar_exercicios', False)
 
-        # Verifica primeira pagina
-        screenshot = await self.page.screenshot(type="png")
-        img_base64 = base64.b64encode(screenshot).decode()
+        if procurar:
+            logger.info("Fase 1: Procurando exercicios no documento...")
+            max_buscas = 20  # Maximo de verificacoes (20 * 18 scrolls = ~360 scrolls)
+            scrolls_por_busca = 18
+            encontrou_exercicios = False
+            client = Anthropic(api_key=self.agent.client.api_key)
 
-        try:
-            response = client.messages.create(
-                model="claude-sonnet-4-20250514",
-                max_tokens=50,
-                messages=[{
-                    "role": "user",
-                    "content": [
-                        {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": img_base64}},
-                        {"type": "text", "text": "Esta pagina contem exercicios, questoes, lista de atividades ou perguntas para responder? Responda apenas YES ou NO."}
-                    ]
-                }]
-            )
-            if "YES" in response.content[0].text.upper():
-                encontrou_exercicios = True
-                logger.info("Exercicios encontrados na primeira pagina!")
-        except Exception as e:
-            logger.warning(f"Erro ao verificar primeira pagina: {e}")
-            encontrou_exercicios = True  # Assume que tem para nao perder conteudo
+            # Verifica primeira pagina
+            screenshot = await self.page.screenshot(type="png")
+            img_base64 = base64.b64encode(screenshot).decode()
 
-        # Se nao encontrou, faz scroll procurando
-        if not encontrou_exercicios:
-            for busca in range(max_buscas):
-                # Scroll rapido
-                logger.info(f"Busca {busca + 1}/{max_buscas}: scrollando...")
+            try:
+                response = client.messages.create(
+                    model="claude-sonnet-4-20250514",
+                    max_tokens=50,
+                    messages=[{
+                        "role": "user",
+                        "content": [
+                            {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": img_base64}},
+                            {"type": "text", "text": "Esta pagina contem exercicios, questoes, lista de atividades ou perguntas para responder? Responda apenas YES ou NO."}
+                        ]
+                    }]
+                )
+                if "YES" in response.content[0].text.upper():
+                    encontrou_exercicios = True
+                    logger.info("Exercicios encontrados na primeira pagina!")
+            except Exception as e:
+                logger.warning(f"Erro ao verificar primeira pagina: {e}")
+                encontrou_exercicios = True  # Assume que tem para nao perder conteudo
+
+            # Se nao encontrou, faz scroll procurando
+            if not encontrou_exercicios:
+                for busca in range(max_buscas):
+                    # Scroll rapido
+                    logger.info(f"Busca {busca + 1}/{max_buscas}: scrollando...")
+                    try:
+                        async with asyncio.timeout(30):
+                            for _ in range(scrolls_por_busca):
+                                await self.page.keyboard.press("ArrowDown")
+                                await asyncio.sleep(0.05)  # Mais rapido na busca
+                    except asyncio.TimeoutError:
+                        logger.warning("Timeout no scroll de busca")
+                        break
+
+                    await asyncio.sleep(1)
+
+                    # Verifica se tem exercicios
+                    screenshot = await self.page.screenshot(type="png")
+                    img_base64 = base64.b64encode(screenshot).decode()
+
+                    try:
+                        response = client.messages.create(
+                            model="claude-sonnet-4-20250514",
+                            max_tokens=50,
+                            messages=[{
+                                "role": "user",
+                                "content": [
+                                    {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": img_base64}},
+                                    {"type": "text", "text": "Esta pagina contem exercicios, questoes, lista de atividades ou perguntas para responder? Responda apenas YES ou NO."}
+                                ]
+                            }]
+                        )
+                        if "YES" in response.content[0].text.upper():
+                            encontrou_exercicios = True
+                            logger.info(f"Exercicios encontrados na busca {busca + 1}!")
+                            break
+                    except Exception as e:
+                        logger.warning(f"Erro ao verificar pagina: {e}")
+
+            if not encontrou_exercicios:
+                logger.info("Nao encontrou em 20 buscas, indo pro final do documento...")
                 try:
-                    async with asyncio.timeout(30):
-                        for _ in range(scrolls_por_busca):
-                            await self.page.keyboard.press("ArrowDown")
-                            await asyncio.sleep(0.05)  # Mais rapido na busca
-                except asyncio.TimeoutError:
-                    logger.warning("Timeout no scroll de busca")
-                    break
+                    await self.page.keyboard.press("Control+End")
+                    await asyncio.sleep(3)
 
-                await asyncio.sleep(1)
+                    # Verifica se tem exercicios no final
+                    screenshot = await self.page.screenshot(type="png")
+                    img_base64 = base64.b64encode(screenshot).decode()
 
-                # Verifica se tem exercicios
-                screenshot = await self.page.screenshot(type="png")
-                img_base64 = base64.b64encode(screenshot).decode()
-
-                try:
                     response = client.messages.create(
                         model="claude-sonnet-4-20250514",
                         max_tokens=50,
@@ -441,28 +487,29 @@ class FileSearcher:
                     )
                     if "YES" in response.content[0].text.upper():
                         encontrou_exercicios = True
-                        logger.info(f"Exercicios encontrados na busca {busca + 1}!")
-                        break
+                        self._capturar_de_baixo_pra_cima = True
+                        logger.info("Exercicios encontrados no final! Vai capturar de baixo pra cima.")
+                    else:
+                        logger.warning("Nao encontrou exercicios nem no final, capturando do inicio...")
+                        await self.page.keyboard.press("Control+Home")
+                        await asyncio.sleep(2)
                 except Exception as e:
-                    logger.warning(f"Erro ao verificar pagina: {e}")
-
-                # Verifica se chegou ao fim do documento
-                with open(self.data_dir / "temp_check.png", "wb") as f:
-                    f.write(screenshot)
-
-        if not encontrou_exercicios:
-            logger.warning("Nao encontrou exercicios, capturando do inicio...")
-            # Volta pro inicio do documento
-            try:
-                await self.page.keyboard.press("Control+Home")
-                await asyncio.sleep(2)
-            except Exception:
-                pass
+                    logger.warning(f"Erro ao ir pro final: {e}")
+                    await self.page.keyboard.press("Control+Home")
+                    await asyncio.sleep(2)
+        else:
+            logger.info("Material de referencia - capturando do inicio...")
 
         # FASE 2: Captura screenshots a partir da posicao atual
         logger.info("Fase 2: Capturando screenshots...")
         max_paginas = 30
-        scrolls_por_pagina = 15
+        scrolls_por_pagina = 18
+
+        # Verifica se deve capturar de baixo pra cima
+        capturar_pra_cima = getattr(self, '_capturar_de_baixo_pra_cima', False)
+        direcao = "cima" if capturar_pra_cima else "baixo"
+        tecla_scroll = "ArrowUp" if capturar_pra_cima else "ArrowDown"
+        logger.info(f"Direcao de captura: {direcao}")
 
         # Screenshot inicial
         ss_path = self.data_dir / "arquivo_externo_1.png"
@@ -475,11 +522,11 @@ class FileSearcher:
 
         for i in range(2, max_paginas + 1):
             try:
-                logger.info(f"Scrollando {scrolls_por_pagina}x para baixo...")
+                logger.info(f"Scrollando {scrolls_por_pagina}x para {direcao}...")
                 try:
                     async with asyncio.timeout(30):
                         for _ in range(scrolls_por_pagina):
-                            await self.page.keyboard.press("ArrowDown")
+                            await self.page.keyboard.press(tecla_scroll)
                             await asyncio.sleep(0.1)
                 except asyncio.TimeoutError:
                     logger.warning(f"Timeout no scroll da pagina {i}")
@@ -511,6 +558,11 @@ class FileSearcher:
             except Exception as e:
                 logger.warning(f"Erro ao capturar screenshot {i}: {e}")
                 break
+
+        # Se capturou de baixo pra cima, inverte a ordem dos screenshots
+        if capturar_pra_cima and len(resultado["screenshots"]) > 1:
+            logger.info("Invertendo ordem dos screenshots (de baixo pra cima -> cima pra baixo)")
+            resultado["screenshots"] = resultado["screenshots"][::-1]
 
         logger.info(f"Total: {len(resultado['screenshots'])} screenshots capturados")
         return resultado
