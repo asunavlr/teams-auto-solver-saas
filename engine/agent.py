@@ -223,15 +223,14 @@ NOT_FOUND: motivo breve"""
             text = response.content[0].text.strip()
             logger.debug(f"Claude Vision resposta: {text}")
 
-            if text.startswith("CLICK:"):
-                coords = text.replace("CLICK:", "").strip()
-                match = re.match(r"(\d+)\s*,\s*(\d+)", coords)
-                if match:
-                    x, y = int(match.group(1)), int(match.group(2))
-                    logger.info(f"Claude Vision: clicando em ({x}, {y}) para '{descricao}'")
-                    await self.page.mouse.click(x, y)
-                    await self.page.wait_for_timeout(1000)
-                    return True
+            # Procura CLICK: em qualquer lugar da resposta
+            click_match = re.search(r"CLICK:\s*(\d+)\s*,\s*(\d+)", text)
+            if click_match:
+                x, y = int(click_match.group(1)), int(click_match.group(2))
+                logger.info(f"Claude Vision: clicando em ({x}, {y}) para '{descricao}'")
+                await self.page.mouse.click(x, y)
+                await self.page.wait_for_timeout(1000)
+                return True
 
             logger.warning(f"Claude Vision nao encontrou: {descricao} - {text}")
             return False
