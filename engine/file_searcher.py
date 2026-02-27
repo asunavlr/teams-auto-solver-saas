@@ -244,7 +244,7 @@ class FileSearcher:
         try:
             shared = self.page.locator('text=/^Shared$/i, [aria-label*="Shared"], button:has-text("Shared")').first
             await shared.click(timeout=5000)
-            await asyncio.sleep(3)
+            await asyncio.sleep(5)  # Espera 5 segundos apos clicar em Shared
             logger.info("Entrou em Shared via CSS")
             return True
         except Exception:
@@ -256,7 +256,7 @@ class FileSearcher:
                 "Aba 'Shared' no topo da pagina da turma do Teams, ao lado de 'Posts'"
             )
             if encontrou:
-                await asyncio.sleep(3)
+                await asyncio.sleep(5)  # Espera 5 segundos apos clicar em Shared
                 logger.info("Entrou em Shared via Vision")
                 return True
         except Exception as e:
@@ -340,11 +340,14 @@ class FileSearcher:
             try:
                 encontrou_pasta = await self.agent._clicar_com_visao(
                     "Uma pasta ou diretorio na lista de arquivos do Teams. "
-                    "Procure por icone de pasta amarela."
+                    "Procure por icone de pasta amarela e clique nela."
                 )
                 if encontrou_pasta:
-                    await asyncio.sleep(2)
-                    logger.info("Entrou em uma pasta, buscando arquivo dentro...")
+                    # Apenas um clique para selecionar/identificar a pasta
+                    # O clique ja foi feito pelo _clicar_com_visao
+                    logger.info("Pasta clicada, aguardando 10 segundos para carregar...")
+                    await asyncio.sleep(10)  # Espera 10 segundos apos clicar na pasta
+                    logger.info("Pasta aberta, buscando arquivo dentro...")
                     return await self._buscar_arquivo(nome, nivel + 1)
             except Exception as e:
                 logger.debug(f"Nenhuma pasta encontrada: {e}")
