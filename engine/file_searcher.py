@@ -360,8 +360,8 @@ class FileSearcher:
             "tipo": None
         }
 
-        logger.info("Extraindo conteudo do arquivo...")
-        await asyncio.sleep(3)
+        logger.info("Extraindo conteudo do arquivo (aguardando 10s para carregar)...")
+        await asyncio.sleep(10)
 
         # Screenshot do arquivo aberto
         ss_path = self.data_dir / "arquivo_externo_1.png"
