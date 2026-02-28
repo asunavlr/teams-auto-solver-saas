@@ -8,3 +8,9 @@ venv/
 *.spec
 dist/
 build/
+
+# Test files
+test_data/
+test_android_output/
+test_local.py
+test_android.py

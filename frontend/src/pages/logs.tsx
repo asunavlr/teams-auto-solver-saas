@@ -333,7 +333,7 @@ export function LogsPage() {
 
                 <TabsContent value="arquivos" className="mt-4">
                   <ScrollArea className="h-[300px] rounded-md border p-4">
-                    {logDetail.arquivos_enviados?.length > 0 ? (
+                    {logDetail.arquivos_enviados && logDetail.arquivos_enviados.length > 0 ? (
                       <ul className="space-y-2">
                         {logDetail.arquivos_enviados.map((arquivo, idx) => (
                           <li key={idx} className="flex items-center gap-2 text-sm">
