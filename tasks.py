@@ -233,3 +233,87 @@ def executar_cliente(self, client_id: int):
 def health_check():
     """Task de health check para verificar se o worker esta funcionando."""
     return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+
+
+@celery.task(bind=True, max_retries=1, default_retry_delay=30)
+def desfazer_envio_tarefa(self, log_id: int, reprocessar: bool = False):
+    """
+    Desfaz o envio de uma tarefa no Teams.
+
+    Args:
+        log_id: ID do TaskLog
+        reprocessar: Se True, remove do processadas.json para reprocessar
+
+    Returns:
+        Dict com resultado da operacao
+    """
+    logger.info(f"[Celery] Iniciando desfazer envio do log {log_id}")
+
+    with get_app_context():
+        from web import db
+        from web.models import Client, TaskLog, ClientStatus
+
+        # Busca o log
+        task_log = TaskLog.query.get(log_id)
+        if not task_log:
+            logger.error(f"TaskLog {log_id} nao encontrado")
+            return {"error": "Log nao encontrado"}
+
+        # Busca o cliente
+        client = Client.query.get(task_log.client_id)
+        if not client:
+            logger.error(f"Cliente {task_log.client_id} nao encontrado")
+            return {"error": "Cliente nao encontrado"}
+
+        # Atualiza status
+        ClientStatus.set_status(
+            client.id, "running",
+            f"Desfazendo: {task_log.task_name[:30]}..."
+        )
+
+        try:
+            from engine.undo import desfazer_envio
+
+            resultado = asyncio.run(desfazer_envio(
+                client_id=client.id,
+                task_name=task_log.task_name,
+                discipline=task_log.discipline,
+                reprocessar=reprocessar,
+                teams_email=client.teams_email,
+                teams_password=client.teams_password,
+                anthropic_key=client.anthropic_key,
+                data_dir=client.data_dir,
+                auth_state_path=client.data_dir / "auth_state.json",
+                client_name=client.nome,
+            ))
+
+            if resultado["success"]:
+                # Atualiza o TaskLog
+                task_log.status = "undone"
+                task_log.error_msg = f"Desfeito em {datetime.utcnow().strftime('%d/%m/%Y %H:%M')}"
+                if reprocessar:
+                    task_log.error_msg += " (reprocessar)"
+                db.session.commit()
+
+                ClientStatus.set_status(
+                    client.id, "idle",
+                    f"Envio desfeito: {task_log.task_name[:30]}"
+                )
+
+                logger.info(f"[Celery] Envio desfeito com sucesso: {task_log.task_name}")
+                return {"success": True, "message": resultado["message"]}
+            else:
+                ClientStatus.set_status(
+                    client.id, "error",
+                    resultado.get("message", "Erro ao desfazer")[:100]
+                )
+                return {"error": resultado.get("message", "Erro desconhecido")}
+
+        except Exception as e:
+            logger.exception(f"[Celery] Erro ao desfazer envio: {e}")
+            ClientStatus.set_status(client.id, "error", str(e)[:100])
+
+            if self.request.retries < self.max_retries:
+                raise self.retry(exc=e)
+
+            return {"error": str(e)}

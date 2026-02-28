@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from "react"
-import { useQuery } from "@tanstack/react-query"
-import { Download, Search, Terminal, Pause, Play, Trash2, ArrowDown, Eye, FileText, MessageSquare, Files } from "lucide-react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { Download, Search, Terminal, Pause, Play, Trash2, ArrowDown, Eye, FileText, MessageSquare, Files, Undo2, Loader2 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -15,6 +17,10 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PageHeader } from "@/components/shared/page-header"
@@ -42,6 +48,9 @@ export function LogsPage() {
   const search = useDebounce(searchInput, 400)
   const [selectedLogId, setSelectedLogId] = useState<number | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [undoDialogOpen, setUndoDialogOpen] = useState(false)
+  const [reprocessar, setReprocessar] = useState(false)
+  const queryClient = useQueryClient()
 
   // Fetch log detail when selected
   const { data: logDetail, isLoading: loadingDetail } = useQuery({
@@ -54,9 +63,34 @@ export function LogsPage() {
     enabled: !!selectedLogId,
   })
 
+  // Mutation para desfazer envio
+  const undoMutation = useMutation({
+    mutationFn: async ({ logId, reprocessar }: { logId: number; reprocessar: boolean }) => {
+      const res = await api.post(`/logs/${logId}/undo`, { reprocessar })
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["logs"] })
+      queryClient.invalidateQueries({ queryKey: ["log-detail", selectedLogId] })
+      setUndoDialogOpen(false)
+      setDialogOpen(false)
+    },
+  })
+
   const handleRowClick = (logId: number) => {
     setSelectedLogId(logId)
     setDialogOpen(true)
+  }
+
+  const handleUndoClick = () => {
+    setReprocessar(false)
+    setUndoDialogOpen(true)
+  }
+
+  const handleUndoConfirm = () => {
+    if (selectedLogId) {
+      undoMutation.mutate({ logId: selectedLogId, reprocessar })
+    }
   }
 
   // Reset page on filter change
@@ -350,10 +384,74 @@ export function LogsPage() {
                   </ScrollArea>
                 </TabsContent>
               </Tabs>
+
+              {/* Undo Button */}
+              {logDetail.status === "success" && (
+                <div className="flex justify-end pt-4 border-t">
+                  <Button
+                    variant="destructive"
+                    onClick={handleUndoClick}
+                    disabled={undoMutation.isPending}
+                  >
+                    <Undo2 className="mr-2 h-4 w-4" />
+                    Desfazer Envio
+                  </Button>
+                </div>
+              )}
             </div>
           ) : null}
         </DialogContent>
       </Dialog>
+
+      {/* Undo Confirmation Dialog */}
+      <AlertDialog open={undoDialogOpen} onOpenChange={setUndoDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Desfazer envio da tarefa?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Isso vai abrir o navegador do cliente, acessar a tarefa no Teams e clicar em "Desfazer entrega".
+              O processo pode levar alguns minutos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="flex items-center space-x-3 py-4">
+            <Switch
+              id="reprocessar"
+              checked={reprocessar}
+              onCheckedChange={setReprocessar}
+            />
+            <Label htmlFor="reprocessar" className="text-sm">
+              Reprocessar no proximo ciclo
+            </Label>
+          </div>
+          <p className="text-xs text-muted-foreground -mt-2">
+            Se marcado, a tarefa sera processada novamente automaticamente.
+          </p>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={undoMutation.isPending}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleUndoConfirm}
+              disabled={undoMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {undoMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processando...
+                </>
+              ) : (
+                <>
+                  <Undo2 className="mr-2 h-4 w-4" />
+                  Desfazer
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

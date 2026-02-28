@@ -184,3 +184,29 @@ def get_log_detail(log_id):
         "resposta": log.resposta or "",
         "arquivos_enviados": arquivos,
     })
+
+
+@api_logs_bp.route("/<int:log_id>/undo", methods=["POST"])
+@jwt_or_session_required
+def undo_submission(log_id):
+    """Desfaz o envio de uma tarefa."""
+    log = TaskLog.query.get_or_404(log_id)
+
+    # Verifica se pode desfazer
+    if log.status != "success":
+        return jsonify({"error": "Apenas tarefas enviadas podem ser desfeitas"}), 400
+
+    # Pega parametro reprocessar
+    data = request.get_json() or {}
+    reprocessar = data.get("reprocessar", False)
+
+    # Cria task Celery
+    from tasks import desfazer_envio_tarefa
+    task = desfazer_envio_tarefa.delay(log_id, reprocessar)
+
+    return jsonify({
+        "message": "Processando desfazer envio...",
+        "task_id": task.id,
+        "log_id": log_id,
+        "reprocessar": reprocessar,
+    })
