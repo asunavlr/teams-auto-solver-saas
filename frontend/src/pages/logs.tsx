@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { Download, Search, Terminal, Pause, Play, Trash2, ArrowDown } from "lucide-react"
+import { Download, Search, Terminal, Pause, Play, Trash2, ArrowDown, Eye, FileText, MessageSquare, Files } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,6 +12,11 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from "@/components/ui/dialog"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PageHeader } from "@/components/shared/page-header"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { FormatBadge } from "@/components/shared/format-badge"
@@ -35,6 +40,24 @@ export function LogsPage() {
   const [dateTo, setDateTo] = useState("")
   const [searchInput, setSearchInput] = useState("")
   const search = useDebounce(searchInput, 400)
+  const [selectedLogId, setSelectedLogId] = useState<number | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
+
+  // Fetch log detail when selected
+  const { data: logDetail, isLoading: loadingDetail } = useQuery({
+    queryKey: ["log-detail", selectedLogId],
+    queryFn: async () => {
+      if (!selectedLogId) return null
+      const res = await api.get<TaskLogEntry>(`/logs/${selectedLogId}`)
+      return res.data
+    },
+    enabled: !!selectedLogId,
+  })
+
+  const handleRowClick = (logId: number) => {
+    setSelectedLogId(logId)
+    setDialogOpen(true)
+  }
 
   // Reset page on filter change
   useEffect(() => { setPage(1) }, [statusFilter, clientFilter, search, dateFrom, dateTo])
@@ -150,11 +173,16 @@ export function LogsPage() {
                   <TableHead className="w-[70px]">Formato</TableHead>
                   <TableHead className="w-[90px]">Status</TableHead>
                   <TableHead>Erro</TableHead>
+                  <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {logsData.items.map((log) => (
-                  <TableRow key={log.id}>
+                  <TableRow
+                    key={log.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => handleRowClick(log.id)}
+                  >
                     <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{formatDateTime(log.created_at)}</TableCell>
                     <TableCell className="font-medium">{log.client_name}</TableCell>
                     <TableCell className="max-w-[250px] truncate">{log.task_name}</TableCell>
@@ -162,6 +190,11 @@ export function LogsPage() {
                     <TableCell>{log.format && <FormatBadge format={log.format} />}</TableCell>
                     <TableCell><StatusBadge status={log.status} /></TableCell>
                     <TableCell className="max-w-[180px] truncate text-xs text-destructive">{log.error_msg || "—"}</TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="icon" className="h-7 w-7">
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -207,6 +240,120 @@ export function LogsPage() {
 
       {/* Server Terminal */}
       <ServerTerminal />
+
+      {/* Task Detail Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Detalhes da Atividade
+            </DialogTitle>
+            {logDetail && (
+              <DialogDescription className="flex items-center gap-3 pt-2">
+                <StatusBadge status={logDetail.status} />
+                {logDetail.format && <FormatBadge format={logDetail.format} />}
+                <span className="text-xs text-muted-foreground">{formatDateTime(logDetail.created_at)}</span>
+              </DialogDescription>
+            )}
+          </DialogHeader>
+
+          {loadingDetail ? (
+            <div className="space-y-3 py-4">
+              <Skeleton className="h-6 w-3/4" />
+              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-20 w-full" />
+            </div>
+          ) : logDetail ? (
+            <div className="space-y-4">
+              {/* Task Info */}
+              <div className="rounded-lg border p-4 space-y-2">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Cliente:</span>
+                    <span className="ml-2 font-medium">{logDetail.client_name}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Disciplina:</span>
+                    <span className="ml-2">{logDetail.discipline || "—"}</span>
+                  </div>
+                </div>
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Tarefa:</span>
+                  <span className="ml-2 font-medium">{logDetail.task_name}</span>
+                </div>
+                {logDetail.error_msg && (
+                  <div className="text-sm text-destructive">
+                    <span className="font-medium">Erro:</span>
+                    <span className="ml-2">{logDetail.error_msg}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Tabs for Instructions and Response */}
+              <Tabs defaultValue="instrucoes" className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="instrucoes" className="flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Instrucoes
+                  </TabsTrigger>
+                  <TabsTrigger value="resposta" className="flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4" />
+                    Resposta Enviada
+                  </TabsTrigger>
+                  <TabsTrigger value="arquivos" className="flex items-center gap-2">
+                    <Files className="h-4 w-4" />
+                    Arquivos ({logDetail.arquivos_enviados?.length || 0})
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="instrucoes" className="mt-4">
+                  <ScrollArea className="h-[300px] rounded-md border p-4">
+                    {logDetail.instrucoes ? (
+                      <pre className="whitespace-pre-wrap text-sm font-mono">{logDetail.instrucoes}</pre>
+                    ) : (
+                      <div className="text-center text-muted-foreground py-8">
+                        Sem instrucoes registradas
+                      </div>
+                    )}
+                  </ScrollArea>
+                </TabsContent>
+
+                <TabsContent value="resposta" className="mt-4">
+                  <ScrollArea className="h-[300px] rounded-md border p-4">
+                    {logDetail.resposta ? (
+                      <pre className="whitespace-pre-wrap text-sm font-mono">{logDetail.resposta}</pre>
+                    ) : (
+                      <div className="text-center text-muted-foreground py-8">
+                        Sem resposta registrada
+                      </div>
+                    )}
+                  </ScrollArea>
+                </TabsContent>
+
+                <TabsContent value="arquivos" className="mt-4">
+                  <ScrollArea className="h-[300px] rounded-md border p-4">
+                    {logDetail.arquivos_enviados?.length > 0 ? (
+                      <ul className="space-y-2">
+                        {logDetail.arquivos_enviados.map((arquivo, idx) => (
+                          <li key={idx} className="flex items-center gap-2 text-sm">
+                            <Files className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-mono">{arquivo}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="text-center text-muted-foreground py-8">
+                        Nenhum arquivo registrado
+                      </div>
+                    )}
+                  </ScrollArea>
+                </TabsContent>
+              </Tabs>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

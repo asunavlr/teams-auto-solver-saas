@@ -11,6 +11,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import asyncio
+import json
 from datetime import datetime
 from pathlib import Path
 from celery import Celery
@@ -136,6 +137,10 @@ def executar_cliente(self, client_id: int):
 
             for task in resultado.get("tasks", []):
                 try:
+                    # Prepara lista de arquivos como JSON
+                    arquivos = task.get("arquivos", [])
+                    arquivos_json = json.dumps(arquivos) if arquivos else ""
+
                     # Salva log
                     task_log = TaskLog(
                         client_id=client_id,
@@ -144,6 +149,9 @@ def executar_cliente(self, client_id: int):
                         format=task.get("format", ""),
                         status=task.get("status", "error"),
                         error_msg=task.get("error", ""),
+                        instrucoes=task.get("instrucoes", ""),
+                        resposta=task.get("resposta", ""),
+                        arquivos_enviados=arquivos_json,
                     )
                     db.session.add(task_log)
 

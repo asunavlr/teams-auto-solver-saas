@@ -96,4 +96,8 @@ export interface TaskLogEntry {
   status: string
   error_msg: string
   created_at: string
+  // Campos de detalhe (disponiveis apenas ao buscar log individual)
+  instrucoes?: string
+  resposta?: string
+  arquivos_enviados?: string[]
 }

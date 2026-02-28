@@ -218,6 +218,11 @@ class TaskLog(db.Model):
     error_msg = db.Column(db.Text, default="")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    # Detalhes da tarefa
+    instrucoes = db.Column(db.Text, default="")  # Instrucoes originais da tarefa
+    resposta = db.Column(db.Text, default="")  # Resposta gerada pelo Claude
+    arquivos_enviados = db.Column(db.Text, default="")  # JSON com lista de arquivos
+
 
 class Payment(db.Model):
     __tablename__ = "payments"

@@ -419,7 +419,7 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
     nome_tarefa = atividade.get("nome", "")
     disciplina = atividade.get("disciplina", "")
     data_dir = config.data_dir
-    resultado = {"status": "error", "format": "", "error": ""}
+    resultado = {"status": "error", "format": "", "error": "", "instrucoes": "", "resposta": "", "arquivos": []}
 
     log(f"Processando: {nome_tarefa} | {disciplina}", config.nome)
 
@@ -1065,6 +1065,9 @@ CONTEUDO DO ARQUIVO {arquivo_externo}:
         await asyncio.sleep(3)
         resultado["status"] = "success"
         resultado["format"] = formato
+        resultado["instrucoes"] = tarefa_info.get("instrucoes", "")
+        resultado["resposta"] = resposta
+        resultado["arquivos"] = arquivos
         return resultado
 
     except Exception as e:
@@ -1072,6 +1075,9 @@ CONTEUDO DO ARQUIVO {arquivo_externo}:
         resultado["status"] = "error"
         resultado["format"] = formato
         resultado["error"] = str(e)
+        resultado["instrucoes"] = tarefa_info.get("instrucoes", "")
+        resultado["resposta"] = resposta if 'resposta' in dir() else ""
+        resultado["arquivos"] = arquivos if 'arquivos' in dir() else []
         return resultado
 
 
@@ -1215,6 +1221,9 @@ async def ciclo_monitoramento_cliente(config: ClientConfig) -> dict:
                         "status": res["status"],
                         "format": res.get("format", ""),
                         "error": res.get("error", ""),
+                        "instrucoes": res.get("instrucoes", ""),
+                        "resposta": res.get("resposta", ""),
+                        "arquivos": res.get("arquivos", []),
                     }
                     resultado["tasks"].append(task_result)
 
@@ -1233,6 +1242,9 @@ async def ciclo_monitoramento_cliente(config: ClientConfig) -> dict:
                         "status": "error",
                         "format": "",
                         "error": str(e),
+                        "instrucoes": "",
+                        "resposta": "",
+                        "arquivos": [],
                     })
                     resultado["error"] += 1
 

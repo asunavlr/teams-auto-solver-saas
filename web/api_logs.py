@@ -2,6 +2,7 @@
 
 import csv
 import io
+import json
 from datetime import datetime
 from pathlib import Path
 
@@ -153,3 +154,33 @@ def worker_logs():
         })
     except Exception as e:
         return jsonify({"error": str(e), "lines": [], "total": 0})
+
+
+@api_logs_bp.route("/<int:log_id>")
+@jwt_or_session_required
+def get_log_detail(log_id):
+    """Retorna detalhes completos de um log de tarefa."""
+    log = TaskLog.query.get_or_404(log_id)
+
+    # Parse arquivos_enviados se existir
+    arquivos = []
+    if log.arquivos_enviados:
+        try:
+            arquivos = json.loads(log.arquivos_enviados)
+        except (json.JSONDecodeError, TypeError):
+            arquivos = []
+
+    return jsonify({
+        "id": log.id,
+        "client_id": log.client_id,
+        "client_name": log.client.nome,
+        "task_name": log.task_name,
+        "discipline": log.discipline,
+        "format": log.format,
+        "status": log.status,
+        "error_msg": log.error_msg,
+        "created_at": log.created_at.isoformat(),
+        "instrucoes": log.instrucoes or "",
+        "resposta": log.resposta or "",
+        "arquivos_enviados": arquivos,
+    })
