@@ -638,14 +638,24 @@ def resolver_com_claude(tarefa: dict, api_key: str, nome_aluno: str = "") -> str
     if nome_aluno:
         nome_instrucao = f"\nSeu nome e: {nome_aluno}. Use este nome se a tarefa exigir identificacao."
 
+    # Monta bloco de texto extraido dos anexos (se houver)
+    texto_extraido = tarefa.get("texto_extraido", "").strip()
+    bloco_texto_extraido = ""
+    if texto_extraido:
+        bloco_texto_extraido = f"""
+
+CONTEUDO EXTRAIDO DOS ANEXOS:
+{texto_extraido}
+"""
+
     prompt = f"""Voce e um estudante universitario resolvendo suas proprias tarefas.
 Escreva de forma NATURAL e HUMANA, como um aluno real escreveria.{nome_instrucao}
 
 TAREFA: {tarefa.get('nome', 'Sem nome')}
 
 INSTRUCOES DA TAREFA: {tarefa.get('instrucoes', 'Nao especificadas')}
-
-Analise as imagens (se houver) e resolva a tarefa.
+{bloco_texto_extraido}
+Analise o conteudo dos anexos (texto extraido e/ou imagens) e resolva a tarefa.
 
 REGRA OBRIGATORIA - PRIMEIRA LINHA:
 A primeira linha da sua resposta DEVE ser EXATAMENTE no formato:
@@ -702,6 +712,21 @@ REGRAS DA RESPOSTA:
             })
         except Exception:
             pass
+
+    # Adiciona PDFs nativos (suporte direto da API Claude)
+    for pdf_b64 in tarefa.get("pdf_base64", []):
+        try:
+            content.append({
+                "type": "document",
+                "source": {
+                    "type": "base64",
+                    "media_type": "application/pdf",
+                    "data": pdf_b64
+                }
+            })
+            logger.info("PDF nativo adicionado ao request do Claude")
+        except Exception as e:
+            logger.error(f"Erro ao adicionar PDF nativo: {e}")
 
     # Lista de modelos para tentar (fallback)
     modelos = [

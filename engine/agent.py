@@ -100,6 +100,38 @@ class TeamsAgent:
             'a:has-text("Files")',
             'a:has-text("Arquivos")',
         ],
+        "download_preview": [
+            'button[aria-label="Download"]',
+            'button[aria-label="Baixar"]',
+            'button[data-tid="download-button"]',
+            'button:has-text("Download")',
+            'button:has-text("Baixar")',
+            '[data-testid="download-button"]',
+            'button[title="Download"]',
+            'button[title="Baixar"]',
+            'i[data-icon-name="Download"]',
+            'button:has(i[data-icon-name="Download"])',
+        ],
+        "menu_tres_pontos": [
+            'button[aria-label="More options"]',
+            'button[aria-label="Mais opções"]',
+            'button[aria-label="Mais opcoes"]',
+            'button[data-tid="more-options"]',
+            'button:has-text("...")',
+            'button:has-text("⋯")',
+            '[data-testid="more-options"]',
+            'button[title="More options"]',
+            'button[title="Mais opções"]',
+        ],
+        "download_menu_item": [
+            'button:has-text("Download")',
+            'button:has-text("Baixar")',
+            '[role="menuitem"]:has-text("Download")',
+            '[role="menuitem"]:has-text("Baixar")',
+            'span:has-text("Download")',
+            'span:has-text("Baixar")',
+            '[data-tid="download-menu-item"]',
+        ],
     }
 
     # Descricoes para o Claude quando CSS falha
@@ -113,6 +145,9 @@ class TeamsAgent:
         "voltar": "Botao de voltar ou seta para esquerda",
         "teams": "Botao Teams ou Equipes no menu lateral esquerdo para ver lista de turmas",
         "files": "Aba Files ou Arquivos dentro de uma turma para ver materiais compartilhados",
+        "download_preview": "Botao de Download na toolbar superior do preview de documento (icone de seta para baixo)",
+        "menu_tres_pontos": "Botao de tres pontos (...) ou More options ao lado do nome do arquivo anexado",
+        "download_menu_item": "Opcao Download ou Baixar no menu dropdown que apareceu",
     }
 
     def __init__(self, page: Page, anthropic_key: str):

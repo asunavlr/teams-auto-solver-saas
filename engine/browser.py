@@ -34,10 +34,13 @@ class TeamsBrowser:
         if self.auth_state_path.exists():
             logger.info("Carregando sessao salva...")
             self.context = await self.browser.new_context(
-                storage_state=str(self.auth_state_path)
+                storage_state=str(self.auth_state_path),
+                accept_downloads=True
             )
         else:
-            self.context = await self.browser.new_context()
+            self.context = await self.browser.new_context(
+                accept_downloads=True
+            )
 
         self.page = await self.context.new_page()
         logger.info("Navegador iniciado")

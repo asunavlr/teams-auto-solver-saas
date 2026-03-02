@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Optional
 from loguru import logger
 
+from engine.file_extractor import extrair_conteudo_arquivo
+
 
 # Padroes para detectar referencias a arquivos externos nas instrucoes
 PADROES_ARQUIVO_EXTERNO = [
@@ -358,11 +360,106 @@ class FileSearcher:
 
         return False
 
+    async def _tentar_download(self) -> Path | None:
+        """
+        Tenta baixar o arquivo que esta em preview no Teams.
+        Mesma logica de baixar_arquivo_do_teams() do monitor.py, mas sem import circular.
+
+        Returns:
+            Path do arquivo baixado ou None
+        """
+        downloads_dir = self.data_dir / "downloads"
+        downloads_dir.mkdir(parents=True, exist_ok=True)
+
+        # Estrategia 1: Botao de download no preview
+        logger.info("  Tentando download via botao do preview...")
+        try:
+            async with self.page.expect_download(timeout=15000) as download_info:
+                clicou = False
+                for selector in self.agent.SELECTORS.get("download_preview", []):
+                    try:
+                        await self.page.click(selector, timeout=3000)
+                        clicou = True
+                        break
+                    except Exception:
+                        continue
+
+                if not clicou:
+                    clicou = await self.agent._clicar_com_visao(
+                        self.agent.DESCRICOES.get("download_preview",
+                            "Botao de Download na toolbar superior do preview")
+                    )
+
+                if not clicou:
+                    raise Exception("Botao download nao encontrado")
+
+            download = await download_info.value
+            filepath = downloads_dir / download.suggested_filename
+            await download.save_as(str(filepath))
+            logger.info(f"  Download concluido: {filepath.name}")
+            return filepath
+
+        except Exception as e:
+            logger.info(f"  Estrategia 1 (botao preview) falhou: {e}")
+
+        # Estrategia 2: Menu tres pontos
+        logger.info("  Tentando download via menu tres pontos...")
+        try:
+            clicou_menu = False
+            for selector in self.agent.SELECTORS.get("menu_tres_pontos", []):
+                try:
+                    await self.page.click(selector, timeout=3000)
+                    clicou_menu = True
+                    break
+                except Exception:
+                    continue
+
+            if not clicou_menu:
+                clicou_menu = await self.agent._clicar_com_visao(
+                    self.agent.DESCRICOES.get("menu_tres_pontos",
+                        "Botao de tres pontos (...) ao lado do arquivo")
+                )
+
+            if not clicou_menu:
+                raise Exception("Menu tres pontos nao encontrado")
+
+            await asyncio.sleep(1)
+
+            async with self.page.expect_download(timeout=15000) as download_info:
+                clicou_download = False
+                for selector in self.agent.SELECTORS.get("download_menu_item", []):
+                    try:
+                        await self.page.click(selector, timeout=3000)
+                        clicou_download = True
+                        break
+                    except Exception:
+                        continue
+
+                if not clicou_download:
+                    clicou_download = await self.agent._clicar_com_visao(
+                        self.agent.DESCRICOES.get("download_menu_item",
+                            "Opcao Download ou Baixar no menu dropdown")
+                    )
+
+                if not clicou_download:
+                    raise Exception("Item Download no menu nao encontrado")
+
+            download = await download_info.value
+            filepath = downloads_dir / download.suggested_filename
+            await download.save_as(str(filepath))
+            logger.info(f"  Download concluido (via menu): {filepath.name}")
+            return filepath
+
+        except Exception as e:
+            logger.info(f"  Estrategia 2 (menu tres pontos) falhou: {e}")
+
+        return None
+
     async def _extrair_conteudo(self) -> dict:
         """
         Extrai conteudo do arquivo aberto.
-        Primeiro procura onde estao os exercicios usando Vision,
-        depois captura screenshots a partir dali.
+        1. Tenta baixar o arquivo e extrair texto nativamente
+        2. Se falhar, usa screenshots (fluxo original)
 
         Returns:
             {
@@ -383,12 +480,38 @@ class FileSearcher:
         logger.info("Extraindo conteudo do arquivo (aguardando 10s para carregar)...")
         await asyncio.sleep(10)
 
+        # NOVO: Tenta baixar o arquivo e extrair texto nativamente
+        arquivo_baixado = await self._tentar_download()
+
+        if arquivo_baixado and arquivo_baixado.exists():
+            logger.info(f"Download do arquivo externo OK: {arquivo_baixado.name}")
+            conteudo = extrair_conteudo_arquivo(arquivo_baixado)
+
+            if conteudo and conteudo.get("texto", "").strip():
+                resultado["conteudo"] = conteudo["texto"]
+                resultado["tipo"] = arquivo_baixado.suffix.lstrip(".")
+                logger.info(f"Texto extraido do download: {len(conteudo['texto'])} chars, {conteudo.get('paginas', 0)} paginas")
+
+                # Limpa arquivo temporario
+                try:
+                    arquivo_baixado.unlink()
+                    logger.debug(f"Arquivo temporario removido: {arquivo_baixado}")
+                except Exception:
+                    pass
+
+                return resultado
+            else:
+                logger.warning("Download OK mas extracao falhou, usando screenshots como fallback")
+
+        # FALLBACK: Extrai via screenshots (fluxo original)
+        logger.info("Usando screenshots para extrair conteudo do arquivo externo...")
+
         # Tenta extrair texto visivel
         try:
             body_text = await self.page.inner_text("body", timeout=5000)
             texto_limpo = body_text.strip()[:5000]
             resultado["conteudo"] = texto_limpo
-            logger.info(f"Texto extraido: {len(texto_limpo)} caracteres")
+            logger.info(f"Texto extraido da pagina: {len(texto_limpo)} caracteres")
         except Exception as e:
             logger.warning(f"Nao conseguiu extrair texto: {e}")
 
