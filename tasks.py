@@ -317,3 +317,86 @@ def desfazer_envio_tarefa(self, log_id: int, reprocessar: bool = False):
                 raise self.retry(exc=e)
 
             return {"error": str(e)}
+
+
+@celery.task(bind=True, max_retries=1, default_retry_delay=30)
+def reenviar_tarefa_com_arquivos(self, log_id: int, arquivos: list):
+    """
+    Desfaz o envio e reenvia com novos arquivos.
+
+    Args:
+        log_id: ID do TaskLog
+        arquivos: Lista de caminhos dos arquivos para enviar
+
+    Returns:
+        Dict com resultado da operacao
+    """
+    logger.info(f"[Celery] Iniciando reenvio do log {log_id} com {len(arquivos)} arquivo(s)")
+
+    with get_app_context():
+        from web import db
+        from web.models import Client, TaskLog, ClientStatus
+
+        # Busca o log
+        task_log = TaskLog.query.get(log_id)
+        if not task_log:
+            logger.error(f"TaskLog {log_id} nao encontrado")
+            return {"error": "Log nao encontrado"}
+
+        # Busca o cliente
+        client = Client.query.get(task_log.client_id)
+        if not client:
+            logger.error(f"Cliente {task_log.client_id} nao encontrado")
+            return {"error": "Cliente nao encontrado"}
+
+        # Atualiza status
+        ClientStatus.set_status(
+            client.id, "running",
+            f"Reenviando: {task_log.task_name[:30]}..."
+        )
+
+        try:
+            from engine.resubmit import reenviar_tarefa
+
+            resultado = asyncio.run(reenviar_tarefa(
+                client_id=client.id,
+                task_name=task_log.task_name,
+                discipline=task_log.discipline,
+                arquivos=arquivos,
+                teams_email=client.teams_email,
+                teams_password=client.teams_password,
+                data_dir=client.data_dir,
+                auth_state_path=client.data_dir / "auth_state.json",
+                client_name=client.nome,
+            ))
+
+            if resultado["success"]:
+                # Atualiza o TaskLog
+                task_log.status = "success"
+                task_log.error_msg = f"Reenviado em {datetime.utcnow().strftime('%d/%m/%Y %H:%M')}"
+                task_log.arquivos_enviados = json.dumps(arquivos)
+                task_log.resposta = "(Reenvio manual com arquivos)"
+                db.session.commit()
+
+                ClientStatus.set_status(
+                    client.id, "idle",
+                    f"Reenviado: {task_log.task_name[:30]}"
+                )
+
+                logger.info(f"[Celery] Tarefa reenviada com sucesso: {task_log.task_name}")
+                return {"success": True, "message": resultado["message"]}
+            else:
+                ClientStatus.set_status(
+                    client.id, "error",
+                    resultado.get("message", "Erro ao reenviar")[:100]
+                )
+                return {"error": resultado.get("message", "Erro desconhecido")}
+
+        except Exception as e:
+            logger.exception(f"[Celery] Erro ao reenviar tarefa: {e}")
+            ClientStatus.set_status(client.id, "error", str(e)[:100])
+
+            if self.request.retries < self.max_retries:
+                raise self.retry(exc=e)
+
+            return {"error": str(e)}

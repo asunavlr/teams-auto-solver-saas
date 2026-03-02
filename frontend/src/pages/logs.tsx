@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, type ChangeEvent } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Download, Search, Terminal, Pause, Play, Trash2, ArrowDown, Eye, FileText, MessageSquare, Files, Undo2, Loader2 } from "lucide-react"
+import { Download, Search, Terminal, Pause, Play, Trash2, ArrowDown, Eye, FileText, MessageSquare, Files, Undo2, Loader2, Upload, X } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -50,6 +50,8 @@ export function LogsPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [undoDialogOpen, setUndoDialogOpen] = useState(false)
   const [reprocessar, setReprocessar] = useState(false)
+  const [resubmitDialogOpen, setResubmitDialogOpen] = useState(false)
+  const [resubmitFiles, setResubmitFiles] = useState<File[]>([])
   const queryClient = useQueryClient()
 
   // Fetch log detail when selected
@@ -77,6 +79,25 @@ export function LogsPage() {
     },
   })
 
+  // Mutation para reenviar com novos arquivos
+  const resubmitMutation = useMutation({
+    mutationFn: async ({ logId, files }: { logId: number; files: File[] }) => {
+      const formData = new FormData()
+      files.forEach(file => formData.append("files", file))
+      const res = await api.post(`/logs/${logId}/resubmit`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["logs"] })
+      queryClient.invalidateQueries({ queryKey: ["log-detail", selectedLogId] })
+      setResubmitDialogOpen(false)
+      setResubmitFiles([])
+      setDialogOpen(false)
+    },
+  })
+
   const handleRowClick = (logId: number) => {
     setSelectedLogId(logId)
     setDialogOpen(true)
@@ -90,6 +111,27 @@ export function LogsPage() {
   const handleUndoConfirm = () => {
     if (selectedLogId) {
       undoMutation.mutate({ logId: selectedLogId, reprocessar })
+    }
+  }
+
+  const handleResubmitClick = () => {
+    setResubmitFiles([])
+    setResubmitDialogOpen(true)
+  }
+
+  const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setResubmitFiles(prev => [...prev, ...Array.from(e.target.files!)])
+    }
+  }
+
+  const handleRemoveFile = (index: number) => {
+    setResubmitFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const handleResubmitConfirm = () => {
+    if (selectedLogId && resubmitFiles.length > 0) {
+      resubmitMutation.mutate({ logId: selectedLogId, files: resubmitFiles })
     }
   }
 
@@ -368,13 +410,30 @@ export function LogsPage() {
                 <TabsContent value="arquivos" className="mt-4">
                   <ScrollArea className="h-[300px] rounded-md border p-4">
                     {logDetail.arquivos_enviados && logDetail.arquivos_enviados.length > 0 ? (
-                      <ul className="space-y-2">
-                        {logDetail.arquivos_enviados.map((arquivo, idx) => (
-                          <li key={idx} className="flex items-center gap-2 text-sm">
-                            <Files className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-mono">{arquivo}</span>
-                          </li>
-                        ))}
+                      <ul className="space-y-3">
+                        {logDetail.arquivos_enviados.map((arquivo, idx) => {
+                          const fileName = arquivo.split(/[/\\]/).pop() || arquivo
+                          return (
+                            <li key={idx} className="flex items-center justify-between gap-3 p-2 rounded-lg border bg-muted/30">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <Files className="h-4 w-4 text-muted-foreground shrink-0" />
+                                <span className="text-sm truncate" title={arquivo}>{fileName}</span>
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 shrink-0"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  window.open(`/api/logs/${logDetail.id}/files/${idx}`, "_blank")
+                                }}
+                              >
+                                <Download className="h-3 w-3 mr-1" />
+                                Baixar
+                              </Button>
+                            </li>
+                          )
+                        })}
                       </ul>
                     ) : (
                       <div className="text-center text-muted-foreground py-8">
@@ -385,13 +444,21 @@ export function LogsPage() {
                 </TabsContent>
               </Tabs>
 
-              {/* Undo Button */}
-              {logDetail.status === "success" && (
-                <div className="flex justify-end pt-4 border-t">
+              {/* Action Buttons */}
+              {(logDetail.status === "success" || logDetail.status === "success_flagged") && (
+                <div className="flex justify-end gap-2 pt-4 border-t">
+                  <Button
+                    variant="outline"
+                    onClick={handleResubmitClick}
+                    disabled={undoMutation.isPending || resubmitMutation.isPending}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    Reenviar com novo arquivo
+                  </Button>
                   <Button
                     variant="destructive"
                     onClick={handleUndoClick}
-                    disabled={undoMutation.isPending}
+                    disabled={undoMutation.isPending || resubmitMutation.isPending}
                   >
                     <Undo2 className="mr-2 h-4 w-4" />
                     Desfazer Envio
@@ -446,6 +513,96 @@ export function LogsPage() {
                 <>
                   <Undo2 className="mr-2 h-4 w-4" />
                   Desfazer
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Resubmit Dialog */}
+      <AlertDialog open={resubmitDialogOpen} onOpenChange={setResubmitDialogOpen}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reenviar com novos arquivos</AlertDialogTitle>
+            <AlertDialogDescription>
+              Isso vai desfazer a entrega atual e reenviar a tarefa com os arquivos selecionados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="py-4 space-y-4">
+            {/* File Upload Area */}
+            <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center hover:border-muted-foreground/50 transition-colors">
+              <input
+                type="file"
+                id="resubmit-files"
+                multiple
+                className="hidden"
+                onChange={handleFileSelect}
+              />
+              <label
+                htmlFor="resubmit-files"
+                className="cursor-pointer flex flex-col items-center gap-2"
+              >
+                <Upload className="h-8 w-8 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">
+                  Clique para selecionar arquivos
+                </span>
+                <span className="text-xs text-muted-foreground/70">
+                  ou arraste e solte aqui
+                </span>
+              </label>
+            </div>
+
+            {/* Selected Files List */}
+            {resubmitFiles.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Arquivos selecionados:</p>
+                <ul className="space-y-1">
+                  {resubmitFiles.map((file, idx) => (
+                    <li
+                      key={idx}
+                      className="flex items-center justify-between gap-2 p-2 bg-muted/50 rounded text-sm"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Files className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <span className="truncate">{file.name}</span>
+                        <span className="text-xs text-muted-foreground shrink-0">
+                          ({(file.size / 1024).toFixed(1)} KB)
+                        </span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 shrink-0"
+                        onClick={() => handleRemoveFile(idx)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resubmitMutation.isPending}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleResubmitConfirm}
+              disabled={resubmitMutation.isPending || resubmitFiles.length === 0}
+            >
+              {resubmitMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processando...
+                </>
+              ) : (
+                <>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Reenviar ({resubmitFiles.length} arquivo{resubmitFiles.length !== 1 ? "s" : ""})
                 </>
               )}
             </AlertDialogAction>

@@ -3,16 +3,22 @@
 import csv
 import io
 import json
+import mimetypes
+import os
+import uuid
 from datetime import datetime
 from pathlib import Path
 
-from flask import Blueprint, jsonify, request, Response
+from flask import Blueprint, jsonify, request, Response, send_file, abort
+from werkzeug.utils import secure_filename
 
 from web import db
 from web.models import Client, TaskLog
 from web.api_auth import jwt_or_session_required
+import config as cfg
 
 WORKER_LOG_FILE = Path("/app/logs/worker.log")
+UPLOAD_FOLDER = Path(cfg.BASE_DIR) / "uploads" / "resubmit"
 
 api_logs_bp = Blueprint("api_logs", __name__, url_prefix="/api/logs")
 
@@ -186,6 +192,50 @@ def get_log_detail(log_id):
     })
 
 
+@api_logs_bp.route("/<int:log_id>/files/<int:file_index>")
+@jwt_or_session_required
+def download_file(log_id, file_index):
+    """Download de arquivo anexo de uma tarefa."""
+    log = TaskLog.query.get_or_404(log_id)
+
+    # Parse arquivos_enviados
+    arquivos = []
+    if log.arquivos_enviados:
+        try:
+            arquivos = json.loads(log.arquivos_enviados)
+        except (json.JSONDecodeError, TypeError):
+            arquivos = []
+
+    if not arquivos or file_index < 0 or file_index >= len(arquivos):
+        abort(404, description="Arquivo não encontrado")
+
+    file_path = arquivos[file_index]
+
+    # Verifica se o caminho é relativo ou absoluto
+    if not os.path.isabs(file_path):
+        # Se relativo, assume que está em relação ao diretório base
+        file_path = os.path.join(cfg.BASE_DIR, file_path)
+
+    # Verifica se arquivo existe
+    if not os.path.exists(file_path):
+        abort(404, description="Arquivo não encontrado no servidor")
+
+    # Determina o mimetype
+    mimetype, _ = mimetypes.guess_type(file_path)
+    if not mimetype:
+        mimetype = "application/octet-stream"
+
+    # Extrai nome do arquivo
+    filename = os.path.basename(file_path)
+
+    return send_file(
+        file_path,
+        mimetype=mimetype,
+        as_attachment=True,
+        download_name=filename
+    )
+
+
 @api_logs_bp.route("/<int:log_id>/undo", methods=["POST"])
 @jwt_or_session_required
 def undo_submission(log_id):
@@ -209,4 +259,53 @@ def undo_submission(log_id):
         "task_id": task.id,
         "log_id": log_id,
         "reprocessar": reprocessar,
+    })
+
+
+@api_logs_bp.route("/<int:log_id>/resubmit", methods=["POST"])
+@jwt_or_session_required
+def resubmit_with_files(log_id):
+    """Desfaz envio e reenvia com novos arquivos."""
+    log = TaskLog.query.get_or_404(log_id)
+
+    # Verifica se pode reenviar
+    if log.status not in ("success", "success_flagged"):
+        return jsonify({"error": "Apenas tarefas enviadas podem ser reenviadas"}), 400
+
+    # Verifica se tem arquivos
+    if "files" not in request.files:
+        return jsonify({"error": "Nenhum arquivo enviado"}), 400
+
+    files = request.files.getlist("files")
+    if not files or all(f.filename == "" for f in files):
+        return jsonify({"error": "Nenhum arquivo selecionado"}), 400
+
+    # Cria pasta temporaria para os arquivos
+    upload_id = str(uuid.uuid4())
+    upload_path = UPLOAD_FOLDER / upload_id
+    upload_path.mkdir(parents=True, exist_ok=True)
+
+    saved_files = []
+    try:
+        for file in files:
+            if file.filename:
+                filename = secure_filename(file.filename)
+                filepath = upload_path / filename
+                file.save(str(filepath))
+                saved_files.append(str(filepath))
+    except Exception as e:
+        return jsonify({"error": f"Erro ao salvar arquivos: {str(e)}"}), 500
+
+    if not saved_files:
+        return jsonify({"error": "Nenhum arquivo foi salvo"}), 400
+
+    # Cria task Celery para reenvio
+    from tasks import reenviar_tarefa_com_arquivos
+    task = reenviar_tarefa_com_arquivos.delay(log_id, saved_files)
+
+    return jsonify({
+        "message": "Processando reenvio com novos arquivos...",
+        "task_id": task.id,
+        "log_id": log_id,
+        "files_count": len(saved_files),
     })
