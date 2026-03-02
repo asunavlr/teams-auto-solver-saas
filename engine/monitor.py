@@ -17,6 +17,7 @@ from loguru import logger
 from engine.browser import TeamsBrowser
 from engine.solver import (
     resolver_com_claude,
+    analisar_intencao_tarefa,
     detectar_formato_resposta,
     detectar_formato_da_resposta,
     remover_marcador_formato,
@@ -1164,6 +1165,26 @@ CONTEUDO DO ARQUIVO {arquivo_externo}:
             resultado["error"] = f"Erro ao buscar arquivo: {str(e)}"
             return resultado
 
+    # Analisa intencao da tarefa antes de resolver
+    log("Analisando intencao da tarefa...", config.nome)
+    analise = analisar_intencao_tarefa(tarefa_info, config.anthropic_key)
+
+    log(f"  Categoria: {analise['categoria']} ({analise['confianca']}%)", config.nome)
+    log(f"  Motivo: {analise['motivo']}", config.nome)
+
+    # Se nao pode resolver, pula a tarefa
+    if not analise["pode_resolver"]:
+        log(f"Tarefa nao resolvivel: {analise['categoria']}", config.nome)
+        resultado["status"] = analise["status_skip"] or "skipped"
+        resultado["error"] = f"{analise['categoria']}: {analise['motivo']}"
+        resultado["instrucoes"] = tarefa_info.get("instrucoes", "")
+        return resultado
+
+    # Flag para revisao se confianca baixa ou incerto
+    flag_revisar = analise.get("flag_revisar", False)
+    if flag_revisar:
+        log("  ⚠️ Tarefa marcada para revisao (confianca baixa)", config.nome)
+
     # Resolve com Claude
     log("Enviando para Claude...", config.nome)
     resposta = resolver_com_claude(tarefa_info, config.anthropic_key, config.nome)
@@ -1301,11 +1322,13 @@ CONTEUDO DO ARQUIVO {arquivo_externo}:
                 await asyncio.sleep(1)
 
         await asyncio.sleep(3)
-        resultado["status"] = "success"
+        resultado["status"] = "success_flagged" if flag_revisar else "success"
         resultado["format"] = formato
         resultado["instrucoes"] = tarefa_info.get("instrucoes", "")
         resultado["resposta"] = resposta
         resultado["arquivos"] = arquivos
+        resultado["categoria"] = analise.get("categoria", "")
+        resultado["confianca"] = analise.get("confianca", 0)
         limpar_downloads(data_dir)
         return resultado
 

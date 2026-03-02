@@ -624,6 +624,194 @@ android.enableJetifier=true
 
 
 # ============================================================
+# ANALISE DE INTENCAO DA TAREFA
+# ============================================================
+
+# Categorias de tarefas
+CATEGORIA_RESOLVIVEL = "RESOLVIVEL"
+CATEGORIA_CERTIFICADO = "CERTIFICADO"
+CATEGORIA_AVISO = "AVISO"
+CATEGORIA_GRUPO = "GRUPO"
+CATEGORIA_RECURSO_EXTERNO = "RECURSO_EXTERNO"
+CATEGORIA_PRESENCIAL = "PRESENCIAL"
+CATEGORIA_PESSOAL = "PESSOAL"
+CATEGORIA_INCERTO = "INCERTO"
+
+CATEGORIAS_PULAR = [
+    CATEGORIA_CERTIFICADO,
+    CATEGORIA_AVISO,
+    CATEGORIA_GRUPO,
+    CATEGORIA_RECURSO_EXTERNO,
+    CATEGORIA_PRESENCIAL,
+    CATEGORIA_PESSOAL,
+]
+
+
+def analisar_intencao_tarefa(tarefa: dict, api_key: str) -> dict:
+    """
+    Analisa a intencao da tarefa e determina se deve ser resolvida.
+
+    Args:
+        tarefa: Dict com nome, instrucoes, screenshots, texto_extraido
+        api_key: Chave da API Anthropic
+
+    Returns:
+        {
+            "categoria": str,  # RESOLVIVEL, AVISO, PESSOAL, etc
+            "confianca": int,  # 0-100
+            "motivo": str,     # Explicacao breve
+            "pode_resolver": bool,  # Se deve tentar resolver
+            "status_skip": str | None  # Status para log se pular
+        }
+    """
+    client = anthropic.Anthropic(api_key=api_key)
+
+    nome_tarefa = tarefa.get("nome", "")
+    instrucoes = tarefa.get("instrucoes", "")
+    texto_extraido = tarefa.get("texto_extraido", "")
+
+    # Monta contexto completo
+    contexto = f"""NOME DA TAREFA: {nome_tarefa}
+
+INSTRUCOES: {instrucoes}"""
+
+    if texto_extraido:
+        # Limita texto extraido para nao estourar tokens
+        texto_limitado = texto_extraido[:3000]
+        contexto += f"""
+
+CONTEUDO DOS ANEXOS (resumo):
+{texto_limitado}"""
+
+    prompt = f"""Analise esta tarefa educacional e classifique em UMA das categorias:
+
+{contexto}
+
+CATEGORIAS:
+
+1. RESOLVIVEL - Tarefa que pode ser respondida com texto, codigo ou documento
+   Exemplos: dissertacao, exercicios, programacao, pesquisa, analise de caso, relatorio
+
+2. CERTIFICADO - Exige documento pessoal do aluno que ele precisa ter
+   Exemplos: upload de certificado de curso, comprovante de atividade extracurricular, declaracao pessoal
+
+3. AVISO - Apenas comunicado informativo, NAO requer entrega
+   Exemplos: lembrete de prova, informativo sobre aula, orientacoes gerais, aviso de ferias
+
+4. GRUPO - Requer formacao de equipe ou decisao coletiva
+   Exemplos: escolher grupo, definir tema com a equipe, cadastro de integrantes
+
+5. RECURSO_EXTERNO - Requer algo que o ALUNO precisa ter criado/possuir
+   Exemplos: "envie o link do SEU GitHub", "compartilhe SEU portfolio", "link do SEU video no YouTube"
+   IMPORTANTE: NAO e recurso externo se for apenas acessar material do professor
+
+6. PRESENCIAL - Requer presenca fisica ou acao impossivel remotamente
+   Exemplos: prova presencial, visita tecnica, apresentacao ao vivo
+
+7. PESSOAL - Requer experiencia ou opiniao UNICA e PESSOAL do aluno
+   Exemplos: "descreva SUA experiencia de estagio", "conte sobre SEU projeto pessoal", autoavaliacao
+   IMPORTANTE: Perguntas genericas de opiniao (ex: "o que voce acha sobre X") SAO resolviveis
+
+8. INCERTO - Instrucoes confusas, incompletas ou ambiguas demais
+
+REGRAS DE DECISAO:
+- Se parece uma tarefa academica normal (exercicio, trabalho, prova), e RESOLVIVEL
+- Se pede QUALQUER tipo de documento/texto/codigo como resposta, e RESOLVIVEL
+- Se menciona "envie", "entregue", "responda" com conteudo academico, e RESOLVIVEL
+- Apenas classifique como nao-resolvivel se tiver CERTEZA que se encaixa nas outras categorias
+- Na duvida entre RESOLVIVEL e outra categoria, escolha RESOLVIVEL
+
+Responda APENAS com JSON valido, sem markdown:
+{{"categoria": "CATEGORIA", "confianca": 0-100, "motivo": "explicacao breve em 1 linha"}}"""
+
+    try:
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=200,
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        resposta_texto = response.content[0].text.strip()
+
+        # Tenta extrair JSON
+        # Remove possivel markdown
+        resposta_texto = re.sub(r'^```json\s*', '', resposta_texto)
+        resposta_texto = re.sub(r'\s*```$', '', resposta_texto)
+
+        resultado = json.loads(resposta_texto)
+
+        categoria = resultado.get("categoria", CATEGORIA_INCERTO).upper()
+        confianca = int(resultado.get("confianca", 50))
+        motivo = resultado.get("motivo", "")
+
+        # Valida categoria
+        categorias_validas = [
+            CATEGORIA_RESOLVIVEL, CATEGORIA_CERTIFICADO, CATEGORIA_AVISO,
+            CATEGORIA_GRUPO, CATEGORIA_RECURSO_EXTERNO, CATEGORIA_PRESENCIAL,
+            CATEGORIA_PESSOAL, CATEGORIA_INCERTO
+        ]
+        if categoria not in categorias_validas:
+            categoria = CATEGORIA_INCERTO
+            confianca = 30
+
+        # Determina se pode resolver
+        pode_resolver = True
+        status_skip = None
+
+        if categoria in CATEGORIAS_PULAR and confianca >= 70:
+            pode_resolver = False
+            status_map = {
+                CATEGORIA_CERTIFICADO: "skipped_certificate",
+                CATEGORIA_AVISO: "skipped_announcement",
+                CATEGORIA_GRUPO: "skipped_group",
+                CATEGORIA_RECURSO_EXTERNO: "skipped_external",
+                CATEGORIA_PRESENCIAL: "skipped_presence",
+                CATEGORIA_PESSOAL: "skipped_personal",
+            }
+            status_skip = status_map.get(categoria, "skipped")
+
+        # Se confianca muito baixa, marca como incerto
+        if confianca < 40:
+            pode_resolver = False
+            status_skip = "skipped_uncertain"
+
+        logger.info(f"Analise de intencao: {categoria} ({confianca}%) - {motivo}")
+
+        return {
+            "categoria": categoria,
+            "confianca": confianca,
+            "motivo": motivo,
+            "pode_resolver": pode_resolver,
+            "status_skip": status_skip,
+            "flag_revisar": categoria == CATEGORIA_INCERTO or (40 <= confianca < 70),
+        }
+
+    except json.JSONDecodeError as e:
+        logger.warning(f"Erro ao parsear JSON da analise: {e}")
+        # Em caso de erro, assume resolvivel para nao bloquear
+        return {
+            "categoria": CATEGORIA_RESOLVIVEL,
+            "confianca": 50,
+            "motivo": "Erro na analise, assumindo resolvivel",
+            "pode_resolver": True,
+            "status_skip": None,
+            "flag_revisar": True,
+        }
+
+    except Exception as e:
+        logger.error(f"Erro na analise de intencao: {e}")
+        # Em caso de erro, assume resolvivel
+        return {
+            "categoria": CATEGORIA_RESOLVIVEL,
+            "confianca": 50,
+            "motivo": f"Erro: {str(e)[:50]}",
+            "pode_resolver": True,
+            "status_skip": None,
+            "flag_revisar": True,
+        }
+
+
+# ============================================================
 # CLAUDE API
 # ============================================================
 
