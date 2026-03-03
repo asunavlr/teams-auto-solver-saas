@@ -5,7 +5,7 @@
  * Antes do fix, o browser interpretava como hora local, causando diff errado.
  * Agora o frontend trata strings sem Z/offset como UTC (via ensureUTC).
  */
-import { describe, it, expect, vi, afterEach } from "vitest"
+import { describe, it, expect } from "vitest"
 import { timeAgo, timeUntil, formatDate, formatDateTime } from "../utils"
 
 // Helper: gera ISO string UTC naive (sem Z) para N minutos atras
