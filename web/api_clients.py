@@ -26,12 +26,12 @@ def client_to_dict(client: Client, include_logs: bool = False) -> dict:
         "status": client.status,
         "is_active": client.is_active,
         "is_expired": client.is_expired,
-        "expires_at": client.expires_at.isoformat() if client.expires_at else None,
+        "expires_at": (client.expires_at.isoformat() + "Z") if client.expires_at else None,
         "days_remaining": client.days_remaining,
         "check_interval": client.check_interval,
-        "last_check": client.last_check.isoformat() if client.last_check else None,
+        "last_check": (client.last_check.isoformat() + "Z") if client.last_check else None,
         "tasks_completed": client.tasks_completed,
-        "created_at": client.created_at.isoformat() if client.created_at else None,
+        "created_at": (client.created_at.isoformat() + "Z") if client.created_at else None,
         # Plano
         "plan_id": client.plan_id,
         "plan_name": client.plan.nome if client.plan else None,
@@ -59,7 +59,7 @@ def client_to_dict(client: Client, include_logs: bool = False) -> dict:
             "format": log.format,
             "status": log.status,
             "error_msg": log.error_msg,
-            "created_at": log.created_at.isoformat(),
+            "created_at": log.created_at.isoformat() + "Z",
         } for log in logs]
 
         # Pagamentos
@@ -69,7 +69,7 @@ def client_to_dict(client: Client, include_logs: bool = False) -> dict:
             "id": p.id,
             "amount": p.amount,
             "months": p.months,
-            "created_at": p.created_at.isoformat(),
+            "created_at": p.created_at.isoformat() + "Z",
         } for p in payments]
 
         # Taxa de sucesso

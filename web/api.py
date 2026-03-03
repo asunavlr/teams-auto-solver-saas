@@ -89,7 +89,7 @@ def health_check():
 
     return jsonify({
         "status": "healthy" if healthy else "unhealthy",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.utcnow().isoformat() + "Z",
         "checks": checks
     }), 200 if healthy else 503
 
@@ -193,12 +193,12 @@ def clients_status():
             "days_remaining": client.days_remaining,
             "current_status": status_info.status if status_info else "idle",
             "current_action": status_info.current_action if status_info else None,
-            "last_check": client.last_check.isoformat() if client.last_check else None,
+            "last_check": (client.last_check.isoformat() + "Z") if client.last_check else None,
             "next_check": next_check,
             "last_task": {
                 "name": last_task.task_name,
                 "status": last_task.status,
-                "time": last_task.created_at.isoformat()
+                "time": last_task.created_at.isoformat() + "Z"
             } if last_task else None,
             "tasks_completed": client.tasks_completed,
             "success_rate": client_success_rate,
@@ -230,8 +230,8 @@ def client_status(client_id):
         "subscription_status": "active" if client.is_active else ("paused" if client.status == "paused" else "expired"),
         "current_status": status_info.status if status_info else "idle",
         "current_action": status_info.current_action if status_info else None,
-        "started_at": status_info.started_at.isoformat() if status_info and status_info.started_at else None,
-        "last_check": client.last_check.isoformat() if client.last_check else None,
+        "started_at": (status_info.started_at.isoformat() + "Z") if status_info and status_info.started_at else None,
+        "last_check": (client.last_check.isoformat() + "Z") if client.last_check else None,
         "last_error": status_info.last_error if status_info else None,
         "tasks_completed": client.tasks_completed,
         "recent_logs": [{
@@ -240,7 +240,7 @@ def client_status(client_id):
             "format": log.format,
             "status": log.status,
             "error_msg": log.error_msg,
-            "created_at": log.created_at.isoformat()
+            "created_at": log.created_at.isoformat() + "Z"
         } for log in recent_logs]
     })
 
@@ -276,7 +276,7 @@ def recent_logs():
         "format": log.format,
         "status": log.status,
         "error_msg": log.error_msg,
-        "created_at": log.created_at.isoformat()
+        "created_at": log.created_at.isoformat() + "Z"
     } for log in logs])
 
 
@@ -293,11 +293,11 @@ def activity_timeline():
     hours = {}
     for i in range(24):
         hour = (now - timedelta(hours=i)).replace(minute=0, second=0, microsecond=0)
-        hours[hour.isoformat()] = {"success": 0, "error": 0}
+        hours[hour.isoformat() + "Z"] = {"success": 0, "error": 0}
 
     for log in logs:
         hour = log.created_at.replace(minute=0, second=0, microsecond=0)
-        key = hour.isoformat()
+        key = hour.isoformat() + "Z"
         if key in hours:
             if log.status == "success":
                 hours[key]["success"] += 1
@@ -419,7 +419,7 @@ def recent_errors():
         "client_name": e.client.nome,
         "task_name": e.task_name,
         "error_msg": e.error_msg,
-        "created_at": e.created_at.isoformat()
+        "created_at": e.created_at.isoformat() + "Z"
     } for e in errors])
 
 
