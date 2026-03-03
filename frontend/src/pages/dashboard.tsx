@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   BarChart,
   Bar,
@@ -30,6 +30,7 @@ import {
 import { PageHeader } from "@/components/shared/page-header"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { FormatBadge } from "@/components/shared/format-badge"
+import { ActivityDetailDialog } from "@/components/shared/activity-detail-dialog"
 import api from "@/lib/api"
 import { timeAgo, timeUntil, cn } from "@/lib/utils"
 import { REFRESH_INTERVALS } from "@/lib/constants"
@@ -164,6 +165,9 @@ function ChartTooltip({
 export function DashboardPage() {
   const [lastRefresh, setLastRefresh] = useState(new Date())
   const [secondsAgo, setSecondsAgo] = useState(0)
+  const [selectedLogId, setSelectedLogId] = useState<number | null>(null)
+  const [logDialogOpen, setLogDialogOpen] = useState(false)
+  const queryClient = useQueryClient()
 
   // Tick every second for the "updated X seconds ago" display
   useEffect(() => {
@@ -562,7 +566,14 @@ export function DashboardPage() {
                 <TableBody>
                   {recentTasks && recentTasks.length > 0 ? (
                     recentTasks.map((task) => (
-                      <TableRow key={task.id}>
+                      <TableRow
+                        key={task.id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => {
+                          setSelectedLogId(task.id)
+                          setLogDialogOpen(true)
+                        }}
+                      >
                         <TableCell className="pl-6 font-medium">
                           {task.client_name ?? "—"}
                         </TableCell>
@@ -661,6 +672,14 @@ export function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Task Detail Dialog */}
+      <ActivityDetailDialog
+        logId={selectedLogId}
+        open={logDialogOpen}
+        onOpenChange={setLogDialogOpen}
+        onUndoSuccess={() => queryClient.invalidateQueries({ queryKey: ["recent-tasks"] })}
+      />
     </div>
   )
 }
