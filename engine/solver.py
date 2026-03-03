@@ -629,6 +629,7 @@ android.enableJetifier=true
 
 # Categorias de tarefas
 CATEGORIA_RESOLVIVEL = "RESOLVIVEL"
+CATEGORIA_RESOLVIVEL_MANUAL = "RESOLVIVEL_MANUAL"  # Resolver mas não enviar
 CATEGORIA_CERTIFICADO = "CERTIFICADO"
 CATEGORIA_AVISO = "AVISO"
 CATEGORIA_GRUPO = "GRUPO"
@@ -644,6 +645,11 @@ CATEGORIAS_PULAR = [
     CATEGORIA_RECURSO_EXTERNO,
     CATEGORIA_PRESENCIAL,
     CATEGORIA_PESSOAL,
+]
+
+# Categorias que resolvemos mas não enviamos automaticamente
+CATEGORIAS_ANEXAR_APENAS = [
+    CATEGORIA_RESOLVIVEL_MANUAL,
 ]
 
 
@@ -689,40 +695,45 @@ CONTEUDO DOS ANEXOS (resumo):
 
 CATEGORIAS:
 
-1. RESOLVIVEL - Tarefa que pode ser respondida com texto, codigo ou documento
+1. RESOLVIVEL - Tarefa que pode ser respondida E ENVIADA diretamente com texto, codigo ou documento
    Exemplos: dissertacao, exercicios, programacao, pesquisa, analise de caso, relatorio
+   A entrega e feita anexando arquivo ou texto na propria plataforma
 
-2. CERTIFICADO - Exige documento pessoal do aluno que ele precisa ter
+2. RESOLVIVEL_MANUAL - Tarefa que PODEMOS RESOLVER (gerar o codigo/arquivo), mas o ENVIO precisa ser manual
+   Exemplos: "crie o codigo e envie o link do repositorio GitHub", "desenvolva o projeto e compartilhe no GitHub"
+   Usamos quando: podemos gerar o arquivo, mas a entrega exige repositorio/link externo
+   O sistema vai GERAR o arquivo e ANEXAR, mas NAO vai clicar em entregar
+
+3. CERTIFICADO - Exige documento pessoal do aluno que ele precisa ter
    Exemplos: upload de certificado de curso, comprovante de atividade extracurricular, declaracao pessoal
 
-3. AVISO - Apenas comunicado informativo, NAO requer entrega
+4. AVISO - Apenas comunicado informativo, NAO requer entrega
    Exemplos: lembrete de prova, informativo sobre aula, orientacoes gerais, aviso de ferias
 
-4. GRUPO - Requer formacao de equipe ou decisao coletiva
+5. GRUPO - Requer formacao de equipe ou decisao coletiva
    Exemplos: escolher grupo, definir tema com a equipe, cadastro de integrantes
 
-5. RECURSO_EXTERNO - Requer entrega via repositorio/link externo ou algo que o ALUNO precisa ter
-   Exemplos: "envie o link do repositorio", "compartilhe no GitHub", "link do projeto no GitHub",
-   "publique no seu portfolio", "link do SEU video no YouTube", "entrega via repositorio"
-   IMPORTANTE: Se pede entrega via repositorio/GitHub, e RECURSO_EXTERNO (nao conseguimos criar repo)
+6. RECURSO_EXTERNO - Requer algo que o ALUNO JA PRECISA TER pronto (nao podemos criar)
+   Exemplos: "envie o link do SEU portfolio existente", "link do SEU video JA GRAVADO no YouTube"
+   IMPORTANTE: Se podemos CRIAR o conteudo mas precisa de repo, use RESOLVIVEL_MANUAL
    IMPORTANTE: NAO e recurso externo se for apenas acessar material do professor
 
-6. PRESENCIAL - Requer presenca fisica ou acao impossivel remotamente
+7. PRESENCIAL - Requer presenca fisica ou acao impossivel remotamente
    Exemplos: prova presencial, visita tecnica, apresentacao ao vivo
 
-7. PESSOAL - Requer experiencia ou opiniao UNICA e PESSOAL do aluno
+8. PESSOAL - Requer experiencia ou opiniao UNICA e PESSOAL do aluno
    Exemplos: "descreva SUA experiencia de estagio", "conte sobre SEU projeto pessoal", autoavaliacao
    IMPORTANTE: Perguntas genericas de opiniao (ex: "o que voce acha sobre X") SAO resolviveis
 
-8. INCERTO - Instrucoes confusas, incompletas ou ambiguas demais
+9. INCERTO - Instrucoes confusas, incompletas ou ambiguas demais
 
 REGRAS DE DECISAO:
 - Se parece uma tarefa academica normal (exercicio, trabalho, prova), e RESOLVIVEL
-- Se pede QUALQUER tipo de documento/texto/codigo como resposta, e RESOLVIVEL
-- Se menciona "envie", "entregue", "responda" com conteudo academico, e RESOLVIVEL
-- SE PEDE ENTREGA VIA REPOSITORIO/GITHUB, e RECURSO_EXTERNO (nao temos como criar repo)
+- Se pede QUALQUER tipo de documento/texto/codigo como resposta E pode anexar direto, e RESOLVIVEL
+- SE PEDE CRIAR CODIGO/ARQUIVO + ENTREGAR VIA REPOSITORIO/GITHUB, e RESOLVIVEL_MANUAL
+- Se pede algo que o aluno JA PRECISA TER (video gravado, portfolio existente), e RECURSO_EXTERNO
 - Apenas classifique como nao-resolvivel se tiver CERTEZA que se encaixa nas outras categorias
-- Na duvida entre RESOLVIVEL e outra categoria, escolha RESOLVIVEL
+- Na duvida entre RESOLVIVEL e RESOLVIVEL_MANUAL, escolha RESOLVIVEL_MANUAL se mencionar repositorio
 
 Responda APENAS com JSON valido, sem markdown:
 {{"categoria": "CATEGORIA", "confianca": 0-100, "motivo": "explicacao breve em 1 linha"}}"""
@@ -749,7 +760,8 @@ Responda APENAS com JSON valido, sem markdown:
 
         # Valida categoria
         categorias_validas = [
-            CATEGORIA_RESOLVIVEL, CATEGORIA_CERTIFICADO, CATEGORIA_AVISO,
+            CATEGORIA_RESOLVIVEL, CATEGORIA_RESOLVIVEL_MANUAL,
+            CATEGORIA_CERTIFICADO, CATEGORIA_AVISO,
             CATEGORIA_GRUPO, CATEGORIA_RECURSO_EXTERNO, CATEGORIA_PRESENCIAL,
             CATEGORIA_PESSOAL, CATEGORIA_INCERTO
         ]
@@ -760,7 +772,9 @@ Responda APENAS com JSON valido, sem markdown:
         # Determina se pode resolver
         pode_resolver = True
         status_skip = None
+        anexar_apenas = False
 
+        # Categorias que pulamos completamente
         if categoria in CATEGORIAS_PULAR and confianca >= 70:
             pode_resolver = False
             status_map = {
@@ -772,6 +786,11 @@ Responda APENAS com JSON valido, sem markdown:
                 CATEGORIA_PESSOAL: "skipped_personal",
             }
             status_skip = status_map.get(categoria, "skipped")
+
+        # Categorias que resolvemos mas não enviamos
+        if categoria in CATEGORIAS_ANEXAR_APENAS:
+            pode_resolver = True
+            anexar_apenas = True
 
         # Se confianca muito baixa, marca como incerto
         if confianca < 40:
@@ -785,6 +804,7 @@ Responda APENAS com JSON valido, sem markdown:
             "confianca": confianca,
             "motivo": motivo,
             "pode_resolver": pode_resolver,
+            "anexar_apenas": anexar_apenas,
             "status_skip": status_skip,
             "flag_revisar": categoria == CATEGORIA_INCERTO or (40 <= confianca < 70),
         }
@@ -797,6 +817,7 @@ Responda APENAS com JSON valido, sem markdown:
             "confianca": 50,
             "motivo": "Erro na analise, assumindo resolvivel",
             "pode_resolver": True,
+            "anexar_apenas": False,
             "status_skip": None,
             "flag_revisar": True,
         }
@@ -809,6 +830,7 @@ Responda APENAS com JSON valido, sem markdown:
             "confianca": 50,
             "motivo": f"Erro: {str(e)[:50]}",
             "pode_resolver": True,
+            "anexar_apenas": False,
             "status_skip": None,
             "flag_revisar": True,
         }

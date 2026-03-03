@@ -13,6 +13,7 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
   group: { label: "Grupo", variant: "default", className: "bg-purple-500/15 text-purple-400 border-purple-500/20 hover:bg-purple-500/15" },
   skipped: { label: "Pulado", variant: "default", className: "bg-zinc-500/15 text-zinc-400 border-zinc-500/20 hover:bg-zinc-500/15" },
   undone: { label: "Desfeito", variant: "default", className: "bg-orange-500/15 text-orange-400 border-orange-500/20 hover:bg-orange-500/15" },
+  ready_manual: { label: "Pronto (manual)", variant: "default", className: "bg-violet-500/15 text-violet-400 border-violet-500/20 hover:bg-violet-500/15" },
   // Novos status de analise de intencao
   skipped_announcement: { label: "Aviso", variant: "default", className: "bg-blue-500/15 text-blue-400 border-blue-500/20 hover:bg-blue-500/15" },
   skipped_personal: { label: "Pessoal", variant: "default", className: "bg-pink-500/15 text-pink-400 border-pink-500/20 hover:bg-pink-500/15" },
@@ -39,7 +40,8 @@ export function StatusBadge({ status, showDot = true }: StatusBadgeProps) {
     config.className.includes("cyan") ? "bg-cyan-400" :
     config.className.includes("indigo") ? "bg-indigo-400" :
     config.className.includes("teal") ? "bg-teal-400" :
-    config.className.includes("orange") ? "bg-orange-400" : "bg-zinc-400"
+    config.className.includes("orange") ? "bg-orange-400" :
+    config.className.includes("violet") ? "bg-violet-400" : "bg-zinc-400"
 
   return (
     <Badge variant={config.variant} className={config.className}>

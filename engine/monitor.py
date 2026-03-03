@@ -1185,6 +1185,11 @@ CONTEUDO DO ARQUIVO {arquivo_externo}:
     if flag_revisar:
         log("  ⚠️ Tarefa marcada para revisao (confianca baixa)", config.nome)
 
+    # Flag para anexar apenas (não enviar automaticamente)
+    anexar_apenas = analise.get("anexar_apenas", False)
+    if anexar_apenas:
+        log("  📎 Tarefa será resolvida mas NÃO enviada (requer envio manual)", config.nome)
+
     # Resolve com Claude
     log("Enviando para Claude...", config.nome)
     resposta = resolver_com_claude(tarefa_info, config.anthropic_key, config.nome)
@@ -1267,7 +1272,59 @@ CONTEUDO DO ARQUIVO {arquivo_externo}:
                 resultado["error"] = "Falha ao preencher texto"
                 return resultado
 
-    # Submit
+    # Submit (apenas se não for anexar_apenas)
+    if anexar_apenas:
+        # Não clica em entregar - apenas anexa
+        log("Arquivo(s) anexado(s) - aguardando envio manual pelo aluno", config.nome)
+
+        # Screenshot de comprovacao
+        comp_name = re.sub(r'[^\w]', '', nome_tarefa)[:30]
+        comp_path = str(data_dir / f"anexado_{comp_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
+        await browser.page.screenshot(path=comp_path)
+
+        # Notificacao por email (informando que precisa envio manual)
+        if config.smtp_email and config.notification_email:
+            try:
+                notifier = EmailNotifier(
+                    smtp_email=config.smtp_email,
+                    smtp_password=config.smtp_password,
+                    to_email=config.notification_email,
+                )
+                notifier.notify_tarefa_resolvida(
+                    nome_tarefa, disciplina,
+                    f"[ATENÇÃO: Envio manual necessário]\n\nA tarefa foi resolvida e o arquivo anexado, "
+                    f"mas requer envio manual (ex: via repositório GitHub).\n\n{resposta[:500]}"
+                )
+            except Exception:
+                pass
+
+        # Volta
+        await asyncio.sleep(2)
+        try:
+            back_btn = browser.page.locator('button[aria-label*="Back"], button[aria-label*="Voltar"]').first
+            await back_btn.click(timeout=3000)
+        except Exception:
+            try:
+                assignments_btn = browser.page.locator(
+                    'button:has-text("Assignments"), button:has-text("Atribuições"), button:has-text("Atribuicoes")'
+                ).first
+                await assignments_btn.click(timeout=5000)
+            except Exception:
+                await browser.page.keyboard.press("Escape")
+                await asyncio.sleep(1)
+
+        await asyncio.sleep(3)
+        resultado["status"] = "ready_manual"
+        resultado["format"] = formato
+        resultado["instrucoes"] = tarefa_info.get("instrucoes", "")
+        resultado["resposta"] = resposta
+        resultado["arquivos"] = arquivos
+        resultado["categoria"] = analise.get("categoria", "")
+        resultado["confianca"] = analise.get("confianca", 0)
+        limpar_downloads(data_dir)
+        return resultado
+
+    # Submit normal
     try:
         submit = frame.locator(
             'button:has-text("Turn in again"), button:has-text("Entregar novamente"), '
