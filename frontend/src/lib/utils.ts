@@ -5,13 +5,25 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/** Garante que strings datetime naive sejam tratadas como UTC. */
+function ensureUTC(date: string | Date): Date {
+  if (typeof date === "string") {
+    // Se nao tem Z nem offset (+/-), adiciona Z para forcar UTC
+    if (!date.endsWith("Z") && !/[+-]\d{2}:\d{2}$/.test(date)) {
+      date = date + "Z"
+    }
+    return new Date(date)
+  }
+  return date
+}
+
 export function formatDate(date: string | Date): string {
-  const d = typeof date === "string" ? new Date(date) : date
+  const d = ensureUTC(date)
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })
 }
 
 export function formatDateTime(date: string | Date): string {
-  const d = typeof date === "string" ? new Date(date) : date
+  const d = ensureUTC(date)
   return d.toLocaleDateString("pt-BR", {
     day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
   })
@@ -22,7 +34,7 @@ export function formatCurrency(value: number): string {
 }
 
 export function timeAgo(date: string | Date): string {
-  const d = typeof date === "string" ? new Date(date) : date
+  const d = ensureUTC(date)
   const now = new Date()
   const diffMs = now.getTime() - d.getTime()
   const diffMin = Math.floor(diffMs / 60000)
@@ -35,7 +47,7 @@ export function timeAgo(date: string | Date): string {
 }
 
 export function timeUntil(date: string | Date): string {
-  const d = typeof date === "string" ? new Date(date) : date
+  const d = ensureUTC(date)
   const now = new Date()
   const diffMs = d.getTime() - now.getTime()
   const diffMin = Math.floor(diffMs / 60000)
