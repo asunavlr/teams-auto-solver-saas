@@ -37,6 +37,7 @@ import { PageHeader } from "@/components/shared/page-header"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { FormatBadge } from "@/components/shared/format-badge"
 import { ConfirmDialog } from "@/components/shared/confirm-dialog"
+import { ActivityDetailDialog } from "@/components/shared/activity-detail-dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -101,6 +102,8 @@ export function ClientDetailPage() {
   const [paymentOpen, setPaymentOpen] = useState(false)
   const [editingPayment, setEditingPayment] = useState<{ id: number; amount: number; months: number } | null>(null)
   const [deletePaymentId, setDeletePaymentId] = useState<number | null>(null)
+  const [selectedLogId, setSelectedLogId] = useState<number | null>(null)
+  const [logDialogOpen, setLogDialogOpen] = useState(false)
 
   // ── Query: fetch client with logs + payments ──
   const { data: client, isLoading } = useQuery({
@@ -659,7 +662,14 @@ export function ClientDetailPage() {
                 </TableHeader>
                 <TableBody>
                   {taskLogs.map((log) => (
-                    <TableRow key={log.id}>
+                    <TableRow
+                      key={log.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => {
+                        setSelectedLogId(log.id)
+                        setLogDialogOpen(true)
+                      }}
+                    >
                       <TableCell className="pl-6 text-sm text-muted-foreground">
                         {formatDateTime(log.created_at)}
                       </TableCell>
@@ -996,6 +1006,14 @@ export function ClientDetailPage() {
         confirmLabel="Excluir"
         variant="destructive"
         onConfirm={() => remove.mutate()}
+      />
+
+      {/* ── Activity Detail Dialog ── */}
+      <ActivityDetailDialog
+        logId={selectedLogId}
+        open={logDialogOpen}
+        onOpenChange={setLogDialogOpen}
+        onUndoSuccess={() => queryClient.invalidateQueries({ queryKey: ["client", id] })}
       />
     </motion.div>
   )
