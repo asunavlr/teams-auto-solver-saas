@@ -701,8 +701,10 @@ CATEGORIAS:
 4. GRUPO - Requer formacao de equipe ou decisao coletiva
    Exemplos: escolher grupo, definir tema com a equipe, cadastro de integrantes
 
-5. RECURSO_EXTERNO - Requer algo que o ALUNO precisa ter criado/possuir
-   Exemplos: "envie o link do SEU GitHub", "compartilhe SEU portfolio", "link do SEU video no YouTube"
+5. RECURSO_EXTERNO - Requer entrega via repositorio/link externo ou algo que o ALUNO precisa ter
+   Exemplos: "envie o link do repositorio", "compartilhe no GitHub", "link do projeto no GitHub",
+   "publique no seu portfolio", "link do SEU video no YouTube", "entrega via repositorio"
+   IMPORTANTE: Se pede entrega via repositorio/GitHub, e RECURSO_EXTERNO (nao conseguimos criar repo)
    IMPORTANTE: NAO e recurso externo se for apenas acessar material do professor
 
 6. PRESENCIAL - Requer presenca fisica ou acao impossivel remotamente
@@ -718,6 +720,7 @@ REGRAS DE DECISAO:
 - Se parece uma tarefa academica normal (exercicio, trabalho, prova), e RESOLVIVEL
 - Se pede QUALQUER tipo de documento/texto/codigo como resposta, e RESOLVIVEL
 - Se menciona "envie", "entregue", "responda" com conteudo academico, e RESOLVIVEL
+- SE PEDE ENTREGA VIA REPOSITORIO/GITHUB, e RECURSO_EXTERNO (nao temos como criar repo)
 - Apenas classifique como nao-resolvivel se tiver CERTEZA que se encaixa nas outras categorias
 - Na duvida entre RESOLVIVEL e outra categoria, escolha RESOLVIVEL
 
