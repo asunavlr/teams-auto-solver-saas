@@ -93,7 +93,7 @@ function StatCard({ label, value, icon, description, iconClassName }: StatCardPr
             {icon}
           </div>
         </div>
-        <p className="mt-2 text-2xl font-bold tracking-tight">{value}</p>
+        <p className="mt-2 text-xl font-bold tracking-tight sm:text-2xl">{value}</p>
         {description && (
           <p className="mt-1 text-xs text-muted-foreground">{description}</p>
         )}
@@ -404,9 +404,10 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent>
             {activityQuery.isLoading ? (
-              <Skeleton className="h-[220px] w-full rounded-lg" />
+              <Skeleton className="h-[180px] sm:h-[220px] w-full rounded-lg" />
             ) : (
-              <ResponsiveContainer width="100%" height={220}>
+              <div className="h-[180px] sm:h-[220px]">
+              <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={activity ?? []}
                   margin={{ top: 4, right: 4, bottom: 0, left: -20 }}
@@ -456,6 +457,7 @@ export function DashboardPage() {
                   />
                 </BarChart>
               </ResponsiveContainer>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -480,8 +482,8 @@ export function DashboardPage() {
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="pl-6">Cliente</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Plano</TableHead>
-                    <TableHead className="text-right">Sucesso%</TableHead>
+                    <TableHead className="hidden sm:table-cell">Plano</TableHead>
+                    <TableHead className="hidden sm:table-cell text-right">Sucesso%</TableHead>
                     <TableHead className="pr-6 text-right">
                       Proximo check
                     </TableHead>
@@ -497,10 +499,10 @@ export function DashboardPage() {
                         <TableCell>
                           <StatusBadge status={client.subscription_status} />
                         </TableCell>
-                        <TableCell className="text-muted-foreground">
+                        <TableCell className="hidden sm:table-cell text-muted-foreground">
                           {client.plan_name ?? "—"}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="hidden sm:table-cell text-right">
                           <span
                             className={cn(
                               "font-mono text-sm",
@@ -558,7 +560,7 @@ export function DashboardPage() {
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="pl-6">Cliente</TableHead>
                     <TableHead>Tarefa</TableHead>
-                    <TableHead>Formato</TableHead>
+                    <TableHead className="hidden sm:table-cell">Formato</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="pr-6 text-right">Quando</TableHead>
                   </TableRow>
@@ -578,12 +580,12 @@ export function DashboardPage() {
                           {task.client_name ?? "—"}
                         </TableCell>
                         <TableCell
-                          className="max-w-[200px] truncate text-muted-foreground"
+                          className="max-w-[120px] sm:max-w-[200px] truncate text-muted-foreground"
                           title={task.task_name}
                         >
                           {task.task_name}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="hidden sm:table-cell">
                           {task.format ? (
                             <FormatBadge format={task.format} />
                           ) : (

@@ -180,7 +180,7 @@ export function ActivityDetailDialog({
                 </TabsList>
 
                 <TabsContent value="instrucoes" className="mt-4">
-                  <ScrollArea className="h-[300px] rounded-md border p-4">
+                  <ScrollArea className="h-[200px] sm:h-[300px] rounded-md border p-4">
                     {logDetail.instrucoes ? (
                       <pre className="whitespace-pre-wrap text-sm font-mono">{logDetail.instrucoes}</pre>
                     ) : (
@@ -192,7 +192,7 @@ export function ActivityDetailDialog({
                 </TabsContent>
 
                 <TabsContent value="resposta" className="mt-4">
-                  <ScrollArea className="h-[300px] rounded-md border p-4">
+                  <ScrollArea className="h-[200px] sm:h-[300px] rounded-md border p-4">
                     {logDetail.resposta ? (
                       <pre className="whitespace-pre-wrap text-sm font-mono">{logDetail.resposta}</pre>
                     ) : (
@@ -204,7 +204,7 @@ export function ActivityDetailDialog({
                 </TabsContent>
 
                 <TabsContent value="arquivos" className="mt-4">
-                  <ScrollArea className="h-[300px] rounded-md border p-4">
+                  <ScrollArea className="h-[200px] sm:h-[300px] rounded-md border p-4">
                     {logDetail.arquivos_enviados && logDetail.arquivos_enviados.length > 0 ? (
                       <ul className="space-y-3">
                         {logDetail.arquivos_enviados.map((arquivo, idx) => {

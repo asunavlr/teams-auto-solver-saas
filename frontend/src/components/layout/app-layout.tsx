@@ -13,9 +13,9 @@ export function AppLayout() {
   return (
     <div className="flex min-h-screen">
       <Sidebar />
-      <div className="flex-1 ml-[220px]">
+      <div className="flex-1 min-w-0 md:ml-[220px]">
         <Header />
-        <main className="p-6">
+        <main className="p-4 md:p-6 overflow-x-hidden">
           <Outlet />
         </main>
       </div>

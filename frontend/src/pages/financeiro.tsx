@@ -126,7 +126,7 @@ export function FinanceiroPage() {
   }
 
   return (
-    <div>
+    <div className="min-w-0">
       <PageHeader
         title="Financeiro"
         description="Visao geral de receitas, custos e lucros"
@@ -149,7 +149,7 @@ export function FinanceiroPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Receita do Mes</p>
-                    <p className="text-2xl font-bold text-emerald-500">
+                    <p className="text-xl font-bold text-emerald-500 sm:text-2xl">
                       {formatCurrency(resumo.receita.mes)}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
@@ -168,7 +168,7 @@ export function FinanceiroPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Custos do Mes</p>
-                    <p className="text-2xl font-bold text-red-500">
+                    <p className="text-xl font-bold text-red-500 sm:text-2xl">
                       {formatCurrency(resumo.custos.mes)}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
@@ -187,7 +187,7 @@ export function FinanceiroPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Lucro do Mes</p>
-                    <p className="text-2xl font-bold text-blue-500">
+                    <p className="text-xl font-bold text-blue-500 sm:text-2xl">
                       {formatCurrency(resumo.lucro.mes)}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
@@ -206,7 +206,7 @@ export function FinanceiroPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Margem de Lucro</p>
-                    <p className="text-2xl font-bold text-purple-500">
+                    <p className="text-xl font-bold text-purple-500 sm:text-2xl">
                       {resumo.margem_lucro}%
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
@@ -263,8 +263,8 @@ export function FinanceiroPage() {
           </CardHeader>
           <CardContent>
             {resumo?.clientes_por_plano ? (
-              <div className="flex items-center gap-4">
-                <ResponsiveContainer width="50%" height={200}>
+              <div className="flex flex-col items-center gap-4 sm:flex-row">
+                <ResponsiveContainer width="100%" height={200} className="sm:max-w-[50%]">
                   <PieChart>
                     <Pie
                       data={resumo.clientes_por_plano.filter(p => p.quantidade > 0)}
@@ -333,9 +333,9 @@ export function FinanceiroPage() {
                     <TableHead>Plano</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Preco</TableHead>
-                    <TableHead className="text-right">Custos/Mes</TableHead>
-                    <TableHead className="text-right">Lucro Est.</TableHead>
-                    <TableHead className="text-right">Uso/Mês</TableHead>
+                    <TableHead className="hidden sm:table-cell text-right">Custos/Mes</TableHead>
+                    <TableHead className="hidden sm:table-cell text-right">Lucro Est.</TableHead>
+                    <TableHead className="hidden lg:table-cell text-right">Uso/Mes</TableHead>
                     <TableHead>Renovacao</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -355,13 +355,13 @@ export function FinanceiroPage() {
                       <TableCell className="text-right font-medium">
                         {formatCurrency(cliente.preco_plano)}
                       </TableCell>
-                      <TableCell className="text-right text-red-500">
+                      <TableCell className="hidden sm:table-cell text-right text-red-500">
                         {formatCurrency(cliente.custos_mes)}
                       </TableCell>
-                      <TableCell className={`text-right font-medium ${cliente.lucro_estimado >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                      <TableCell className={`hidden sm:table-cell text-right font-medium ${cliente.lucro_estimado >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
                         {formatCurrency(cliente.lucro_estimado)}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="hidden lg:table-cell text-right">
                         <div className="flex items-center justify-end gap-1">
                           <span className={`text-xs font-medium ${cliente.uso_percentual >= 90 ? 'text-red-500' : cliente.uso_percentual >= 70 ? 'text-yellow-500' : ''}`}>
                             {cliente.tarefas_mes}/{cliente.limite_tarefas ?? '∞'}
@@ -405,7 +405,7 @@ export function FinanceiroPage() {
                 <CheckCircle2 className="h-5 w-5 text-emerald-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{resumo.clientes.ativos}</p>
+                <p className="text-xl font-bold sm:text-2xl">{resumo.clientes.ativos}</p>
                 <p className="text-xs text-muted-foreground">Clientes Ativos</p>
               </div>
             </CardContent>
@@ -417,7 +417,7 @@ export function FinanceiroPage() {
                 <XCircle className="h-5 w-5 text-red-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{resumo.clientes.expirados}</p>
+                <p className="text-xl font-bold sm:text-2xl">{resumo.clientes.expirados}</p>
                 <p className="text-xs text-muted-foreground">Expirados</p>
               </div>
             </CardContent>
@@ -429,7 +429,7 @@ export function FinanceiroPage() {
                 <Clock className="h-5 w-5 text-yellow-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{resumo.clientes.pausados}</p>
+                <p className="text-xl font-bold sm:text-2xl">{resumo.clientes.pausados}</p>
                 <p className="text-xs text-muted-foreground">Pausados</p>
               </div>
             </CardContent>
@@ -441,7 +441,7 @@ export function FinanceiroPage() {
                 <CreditCard className="h-5 w-5 text-blue-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{resumo.tarefas.mes}</p>
+                <p className="text-xl font-bold sm:text-2xl">{resumo.tarefas.mes}</p>
                 <p className="text-xs text-muted-foreground">Tarefas no Mes</p>
               </div>
             </CardContent>

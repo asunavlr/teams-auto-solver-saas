@@ -11,12 +11,12 @@ const navItems = [
   { to: "/financeiro", icon: DollarSign, label: "Financeiro" },
 ]
 
-export function Sidebar() {
+export function SidebarContent({ onNavClick }: { onNavClick?: () => void }) {
   const logout = useLogout()
   const user = useAuthStore((s) => s.user)
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-50 flex w-[220px] flex-col border-r border-border bg-card">
+    <>
       {/* Brand */}
       <div className="flex items-center gap-2.5 border-b border-border px-4 py-4">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 text-sm font-bold text-white">
@@ -38,6 +38,7 @@ export function Sidebar() {
             key={item.to}
             to={item.to}
             end={item.to === "/"}
+            onClick={onNavClick}
             className={({ isActive }) =>
               cn(
                 "flex items-center gap-2.5 rounded-md px-3 py-2 text-[13px] font-medium transition-colors",
@@ -57,6 +58,7 @@ export function Sidebar() {
         </div>
         <NavLink
           to="/clients/new"
+          onClick={onNavClick}
           className={({ isActive }) =>
             cn(
               "flex items-center gap-2.5 rounded-md px-3 py-2 text-[13px] font-medium transition-colors",
@@ -86,6 +88,14 @@ export function Sidebar() {
           </button>
         </div>
       </div>
+    </>
+  )
+}
+
+export function Sidebar() {
+  return (
+    <aside className="fixed inset-y-0 left-0 z-50 hidden w-[220px] flex-col border-r border-border bg-card md:flex">
+      <SidebarContent />
     </aside>
   )
 }

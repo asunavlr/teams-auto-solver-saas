@@ -372,10 +372,10 @@ export function ClientDetailPage() {
       <motion.div variants={item} initial="hidden" animate="show">
         <Card className="py-4">
           <CardContent>
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <div className={cn(
-                  "flex h-10 w-10 items-center justify-center rounded-lg",
+                  "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
                   client.is_trial ? "bg-emerald-500/10" : "bg-indigo-500/10"
                 )}>
                   <Crown className={cn("h-5 w-5", client.is_trial ? "text-emerald-500" : "text-indigo-500")} />
@@ -403,7 +403,7 @@ export function ClientDetailPage() {
                   )}
                 </div>
               </div>
-              <div className="flex flex-1 items-center gap-3 max-w-md">
+              <div className="flex flex-1 items-center gap-3 sm:max-w-md">
                 <Progress
                   value={usagePercent}
                   className={cn(
@@ -415,7 +415,7 @@ export function ClientDetailPage() {
                       : "[&>[data-slot=progress-indicator]]:bg-emerald-500"
                   )}
                 />
-                <span className="whitespace-nowrap text-sm text-muted-foreground">
+                <span className="whitespace-normal text-sm text-muted-foreground sm:whitespace-nowrap">
                   {client.tarefas_mes} de{" "}
                   {client.limite_tarefas ?? "Ilimitadas"} tarefas
                 </span>
@@ -655,8 +655,8 @@ export function ClientDetailPage() {
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="pl-6">Data</TableHead>
                     <TableHead>Tarefa</TableHead>
-                    <TableHead>Disciplina</TableHead>
-                    <TableHead>Formato</TableHead>
+                    <TableHead className="hidden sm:table-cell">Disciplina</TableHead>
+                    <TableHead className="hidden sm:table-cell">Formato</TableHead>
                     <TableHead className="pr-6">Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -673,13 +673,13 @@ export function ClientDetailPage() {
                       <TableCell className="pl-6 text-sm text-muted-foreground">
                         {formatDateTime(log.created_at)}
                       </TableCell>
-                      <TableCell className="max-w-[200px] truncate text-sm font-medium">
+                      <TableCell className="max-w-[120px] sm:max-w-[200px] truncate text-sm font-medium">
                         {log.task_name}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
+                      <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
                         {log.discipline || "-"}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden sm:table-cell">
                         {log.format ? (
                           <FormatBadge format={log.format} />
                         ) : (
