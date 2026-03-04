@@ -163,6 +163,20 @@ async def verificar_activity(browser, data_dir: Path, client_name: str = "", max
         while i < len(lines):
             line = lines[i].strip()
 
+            # Notificacoes que NAO sao assignments (posts, comentarios, etc.)
+            eh_post = (
+                "publicou em" in line or "posted in" in line or
+                "publicou uma nova" in line or "posted a new post" in line or
+                "respondeu a" in line or "replied to" in line or
+                "mencionou você" in line or "mentioned you" in line or
+                "curtiu" in line or "liked" in line or
+                "editou uma postagem" in line or "edited a post" in line or
+                "comentou em" in line or "commented on" in line
+            )
+            if eh_post:
+                i += 1
+                continue
+
             # Detecta em portugues e ingles
             detectou_nova = (
                 "adicionou uma tarefa" in line or
@@ -218,6 +232,15 @@ async def verificar_activity(browser, data_dir: Path, client_name: str = "", max
                 i += 4
             else:
                 i += 1
+
+        # Deduplica por ID (mesmo nome+disciplina+prazo+data gera mesmo hash)
+        vistos = set()
+        atividades_unicas = []
+        for a in atividades:
+            if a["id"] not in vistos:
+                vistos.add(a["id"])
+                atividades_unicas.append(a)
+        atividades = atividades_unicas
 
         # Se encontrou atividades, retorna
         if atividades:
@@ -1508,7 +1531,10 @@ async def ciclo_monitoramento_cliente(config: ClientConfig) -> dict:
                         tentativas_falhas[atividade_id] = tentativas_falhas.get(atividade_id, 0) + 1
                         tentativas = tentativas_falhas[atividade_id]
 
-                        if tentativas >= MAX_TENTATIVAS_NOT_FOUND:
+                        # Atividades "atualizada" sao mais propensas a falso-positivo (posts, updates ja entregues)
+                        max_tentativas = 1 if atividade.get("acao") == "atualizada" else MAX_TENTATIVAS_NOT_FOUND
+
+                        if tentativas >= max_tentativas:
                             # Atingiu limite, marca como processada
                             log(f"Atividade nao encontrada {tentativas}x, marcando como processada", config.nome)
                             processadas[atividade_id] = {
@@ -1519,7 +1545,7 @@ async def ciclo_monitoramento_cliente(config: ClientConfig) -> dict:
                             # Remove do contador
                             del tentativas_falhas[atividade_id]
                         else:
-                            log(f"Atividade nao encontrada (tentativa {tentativas}/{MAX_TENTATIVAS_NOT_FOUND}), vai tentar novamente", config.nome)
+                            log(f"Atividade nao encontrada (tentativa {tentativas}/{max_tentativas}), vai tentar novamente", config.nome)
 
                         salvar_tentativas_falhas(tentativas_falhas, config.processadas_path)
 
