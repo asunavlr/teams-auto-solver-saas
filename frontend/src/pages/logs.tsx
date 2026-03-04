@@ -84,7 +84,7 @@ export function LogsPage() {
   }
 
   return (
-    <div>
+    <div className="min-w-0">
       <PageHeader title="Logs de Execucao" description={logsData ? `${logsData.total} registros encontrados` : "Carregando..."}>
         <Button variant="outline" size="sm" onClick={handleExport}>
           <Download className="mr-1.5 h-4 w-4" />
@@ -94,8 +94,8 @@ export function LogsPage() {
 
       {/* Filters */}
       <Card className="mb-5">
-        <CardContent className="flex flex-wrap items-end gap-3 p-4">
-          <div className="min-w-[140px] flex-1">
+        <CardContent className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div>
             <label className="mb-1 block text-[11px] font-medium text-muted-foreground">Cliente</label>
             <Select value={clientFilter} onValueChange={setClientFilter}>
               <SelectTrigger className="h-9"><SelectValue placeholder="Todos" /></SelectTrigger>
@@ -107,7 +107,7 @@ export function LogsPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="min-w-[120px] flex-1">
+          <div>
             <label className="mb-1 block text-[11px] font-medium text-muted-foreground">Status</label>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="h-9"><SelectValue placeholder="Todos" /></SelectTrigger>
@@ -121,15 +121,15 @@ export function LogsPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="min-w-[130px] flex-1">
+          <div>
             <label className="mb-1 block text-[11px] font-medium text-muted-foreground">De</label>
             <Input type="date" className="h-9" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
           </div>
-          <div className="min-w-[130px] flex-1">
+          <div>
             <label className="mb-1 block text-[11px] font-medium text-muted-foreground">Ate</label>
             <Input type="date" className="h-9" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
           </div>
-          <div className="min-w-[200px] flex-[2]">
+          <div className="sm:col-span-2 lg:col-span-1">
             <label className="mb-1 block text-[11px] font-medium text-muted-foreground">Buscar</label>
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -155,11 +155,11 @@ export function LogsPage() {
                   <TableHead className="w-[110px]">Data</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Tarefa</TableHead>
-                  <TableHead>Disciplina</TableHead>
+                  <TableHead className="hidden sm:table-cell">Disciplina</TableHead>
                   <TableHead className="w-[70px]">Formato</TableHead>
                   <TableHead className="w-[90px]">Status</TableHead>
-                  <TableHead>Erro</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
+                  <TableHead className="hidden sm:table-cell">Erro</TableHead>
+                  <TableHead className="hidden sm:table-cell w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -171,12 +171,12 @@ export function LogsPage() {
                   >
                     <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{formatDateTime(log.created_at)}</TableCell>
                     <TableCell className="font-medium">{log.client_name}</TableCell>
-                    <TableCell className="max-w-[250px] truncate">{log.task_name}</TableCell>
-                    <TableCell className="text-xs">{log.discipline}</TableCell>
+                    <TableCell className="max-w-[120px] sm:max-w-[250px] truncate">{log.task_name}</TableCell>
+                    <TableCell className="hidden sm:table-cell text-xs">{log.discipline}</TableCell>
                     <TableCell>{log.format && <FormatBadge format={log.format} />}</TableCell>
                     <TableCell><StatusBadge status={log.status} /></TableCell>
-                    <TableCell className="max-w-[180px] truncate text-xs text-destructive">{log.error_msg || "—"}</TableCell>
-                    <TableCell>
+                    <TableCell className="hidden sm:table-cell max-w-[180px] truncate text-xs text-destructive">{log.error_msg || "—"}</TableCell>
+                    <TableCell className="hidden sm:table-cell">
                       <Button variant="ghost" size="icon" className="h-7 w-7">
                         <Eye className="h-4 w-4" />
                       </Button>
@@ -191,7 +191,7 @@ export function LogsPage() {
 
       {/* Pagination */}
       {logsData && logsData.pages > 1 && (
-        <div className="mb-6 flex items-center justify-center gap-1">
+        <div className="mb-6 flex items-center justify-center gap-0.5 sm:gap-1">
           <Button variant="outline" size="icon" className="h-8 w-8" disabled={page <= 1} onClick={() => setPage(page - 1)}>
             &lt;
           </Button>
@@ -309,21 +309,22 @@ function ServerTerminal() {
           </div>
           <div className="flex items-center gap-2 text-xs font-medium text-zinc-300">
             <Terminal className="h-3.5 w-3.5" />
-            Logs do Worker (Celery)
+            <span className="hidden sm:inline">Logs do Worker (Celery)</span>
+            <span className="sm:hidden">Worker</span>
           </div>
-          <Badge variant="outline" className="h-5 border-emerald-500/30 bg-emerald-500/10 px-1.5 text-[10px] text-emerald-400">
+          <Badge variant="outline" className="hidden sm:inline-flex h-5 border-emerald-500/30 bg-emerald-500/10 px-1.5 text-[10px] text-emerald-400">
             <span className="mr-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
             Live
           </Badge>
         </div>
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-zinc-400 hover:text-zinc-200" onClick={() => setPaused(!paused)}>
-            {paused ? <Play className="mr-1 h-3 w-3" /> : <Pause className="mr-1 h-3 w-3" />}
-            {paused ? "Retomar" : "Pausar"}
+            {paused ? <Play className="h-3 w-3 sm:mr-1" /> : <Pause className="h-3 w-3 sm:mr-1" />}
+            <span className="hidden sm:inline">{paused ? "Retomar" : "Pausar"}</span>
           </Button>
           <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-zinc-400 hover:text-zinc-200" onClick={clearTerminal}>
-            <Trash2 className="mr-1 h-3 w-3" />
-            Limpar
+            <Trash2 className="h-3 w-3 sm:mr-1" />
+            <span className="hidden sm:inline">Limpar</span>
           </Button>
           <Button
             variant="ghost"
@@ -331,8 +332,8 @@ function ServerTerminal() {
             className={cn("h-7 px-2 text-xs", autoScroll ? "text-emerald-400" : "text-zinc-400 hover:text-zinc-200")}
             onClick={() => setAutoScroll(!autoScroll)}
           >
-            <ArrowDown className="mr-1 h-3 w-3" />
-            Auto-scroll
+            <ArrowDown className="h-3 w-3 sm:mr-1" />
+            <span className="hidden sm:inline">Auto-scroll</span>
           </Button>
         </div>
       </div>
@@ -340,7 +341,7 @@ function ServerTerminal() {
       {/* Terminal Body */}
       <div
         ref={terminalRef}
-        className="max-h-[350px] overflow-y-auto rounded-b-lg border border-border bg-[#0a0a0c] p-4 font-mono text-xs leading-relaxed text-zinc-400"
+        className="max-h-[200px] sm:max-h-[350px] overflow-y-auto rounded-b-lg border border-border bg-[#0a0a0c] p-4 font-mono text-xs leading-relaxed text-zinc-400"
         style={{ scrollbarWidth: "thin", scrollbarColor: "#27272a #0a0a0c" }}
       >
         {lines.length === 0 ? (
