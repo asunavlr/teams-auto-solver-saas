@@ -376,12 +376,76 @@ async def _clicar_em_pagina_ou_frames(browser, seletores: list, timeout: int = 3
     return False
 
 
-async def baixar_arquivo_do_teams(browser, agent, config, data_dir: Path) -> Path | None:
+async def baixar_arquivo_sem_preview(browser, agent, config, data_dir: Path, extensao: str = "") -> Path | None:
     """
-    Tenta baixar o arquivo que esta em preview no Teams.
+    Tenta baixar o arquivo via menu "..." SEM abrir o preview.
 
-    Estrategia 1: Botao de download na toolbar do preview
-    Estrategia 2: Fecha preview, menu "..." ao lado do arquivo, Download
+    Esta é a estratégia mais eficiente - não precisa abrir/fechar preview.
+
+    Args:
+        extensao: Extensão do arquivo para log (ex: ".pdf", ".docx")
+
+    Returns:
+        Path do arquivo baixado ou None se falhou
+    """
+    downloads_dir = data_dir / "downloads"
+    downloads_dir.mkdir(parents=True, exist_ok=True)
+
+    log(f"  Tentando download direto via menu '...' {extensao}...", config.nome)
+
+    try:
+        # Tenta clicar no "..." ao lado do arquivo (SOMENTE em frames de assignments)
+        clicou_menu = False
+        if agent:
+            clicou_menu = await _clicar_em_pagina_ou_frames(
+                browser, agent.SELECTORS.get("menu_tres_pontos", []),
+                somente_frames=True
+            )
+
+            if not clicou_menu:
+                log("  CSS falhou para menu, tentando Vision...", config.nome)
+                clicou_menu = await agent._clicar_com_visao(
+                    f"Botao de tres pontos (...) que fica DENTRO da secao 'Reference materials' ao lado direito do nome do arquivo anexado ({extensao.upper() if extensao else 'PDF/DOCX/XLSX'}). NAO clique nos tres pontos do cabecalho do Activity."
+                )
+
+        if not clicou_menu:
+            raise Exception("Menu tres pontos nao encontrado")
+
+        await asyncio.sleep(2)
+
+        # Clica em Download no menu dropdown
+        async with browser.page.expect_download(timeout=15000) as download_info:
+            clicou_download = await _clicar_em_pagina_ou_frames(
+                browser, agent.SELECTORS.get("download_menu_item", [])
+            ) if agent else False
+
+            if not clicou_download and agent:
+                log("  CSS falhou para Download no menu, tentando Vision...", config.nome)
+                clicou_download = await agent._clicar_com_visao(
+                    "Opcao 'Download' ou 'Baixar' no menu popup/dropdown que apareceu. Pode conter opcoes como Open, Download, Rename, etc."
+                )
+
+            if not clicou_download:
+                raise Exception("Item Download no menu nao encontrado")
+
+        download = await download_info.value
+        filepath = downloads_dir / download.suggested_filename
+        await download.save_as(str(filepath))
+        log(f"  Download direto concluido: {filepath.name}", config.nome)
+        return filepath
+
+    except Exception as e:
+        log(f"  Download direto falhou: {e}", config.nome)
+        return None
+
+
+async def baixar_arquivo_do_preview(browser, agent, config, data_dir: Path) -> Path | None:
+    """
+    Tenta baixar o arquivo que JÁ ESTÁ em preview no Teams.
+
+    Usa apenas estratégias que funcionam com preview aberto:
+    - Botão de download na toolbar do preview
+    - "More actions" na toolbar do preview → Download
 
     Returns:
         Path do arquivo baixado ou None se falhou
@@ -416,7 +480,7 @@ async def baixar_arquivo_do_teams(browser, agent, config, data_dir: Path) -> Pat
     except Exception as e:
         log(f"  Estrategia 1 (botao preview) falhou: {e}", config.nome)
 
-    # Estrategia 1b: "More actions" na toolbar do preview → Download
+    # Estrategia 2: "More actions" na toolbar do preview → Download
     log("  Tentando 'More actions' na toolbar do preview...", config.nome)
     try:
         # Clica em "More actions" / "..." na toolbar do preview
@@ -460,59 +524,9 @@ async def baixar_arquivo_do_teams(browser, agent, config, data_dir: Path) -> Pat
             return filepath
 
     except Exception as e:
-        log(f"  Estrategia 1b (More actions) falhou: {e}", config.nome)
+        log(f"  Estrategia 2 (More actions) falhou: {e}", config.nome)
 
-    # Estrategia 2: Menu tres pontos (ao lado do arquivo na tarefa)
-    log("  Tentando download via menu tres pontos...", config.nome)
-    try:
-        # Fecha o preview primeiro
-        await fechar_preview(browser)
-        await asyncio.sleep(2)
-
-        # Tenta clicar no "..." ao lado do arquivo (SOMENTE em frames de assignments)
-        clicou_menu = False
-        if agent:
-            clicou_menu = await _clicar_em_pagina_ou_frames(
-                browser, agent.SELECTORS.get("menu_tres_pontos", []),
-                somente_frames=True
-            )
-
-            if not clicou_menu:
-                log("  CSS falhou para menu, tentando Vision...", config.nome)
-                clicou_menu = await agent._clicar_com_visao(
-                    "Botao de tres pontos (...) que fica DENTRO da secao 'Reference materials' ao lado direito do nome do arquivo anexado (PDF/DOCX/XLSX). NAO clique nos tres pontos do cabecalho do Activity."
-                )
-
-        if not clicou_menu:
-            raise Exception("Menu tres pontos nao encontrado")
-
-        await asyncio.sleep(2)
-
-        # Clica em Download no menu dropdown
-        async with browser.page.expect_download(timeout=15000) as download_info:
-            clicou_download = await _clicar_em_pagina_ou_frames(
-                browser, agent.SELECTORS.get("download_menu_item", [])
-            ) if agent else False
-
-            if not clicou_download and agent:
-                log("  CSS falhou para Download no menu, tentando Vision...", config.nome)
-                clicou_download = await agent._clicar_com_visao(
-                    "Opcao 'Download' ou 'Baixar' no menu popup/dropdown que apareceu. Pode conter opcoes como Open, Download, Rename, etc."
-                )
-
-            if not clicou_download:
-                raise Exception("Item Download no menu nao encontrado")
-
-        download = await download_info.value
-        filepath = downloads_dir / download.suggested_filename
-        await download.save_as(str(filepath))
-        log(f"  Download concluido (via menu): {filepath.name}", config.nome)
-        return filepath
-
-    except Exception as e:
-        log(f"  Estrategia 2 (menu tres pontos) falhou: {e}", config.nome)
-
-    log("  Todas as estrategias de download falharam", config.nome)
+    log("  Download do preview falhou", config.nome)
     return None
 
 
@@ -850,54 +864,22 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
     tem_imagem = any(ext in content_lower for ext in [".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"])
 
     if tem_pdf:
-        log("PDF encontrado, abrindo preview...", config.nome)
+        log("PDF encontrado, tentando download...", config.nome)
+        download_ok = False
+        arquivo_baixado = None
+
         try:
-            # Encontra e clica no PDF para abrir preview
-            pdf_abriu = False
-
-            # Tenta CSS primeiro
-            try:
-                pdf_link = frame.locator('text=/.pdf/i').first
-                await pdf_link.click(timeout=5000)
-                await asyncio.sleep(3)
-                pdf_abriu = True
-            except Exception:
-                log("  CSS falhou para PDF, tentando Vision...", config.nome)
-
-            # Fallback: Vision para clicar no PDF
-            if not pdf_abriu and agent:
-                pdf_abriu = await agent._clicar_com_visao(
-                    "Arquivo PDF na secao 'Reference materials' ou 'Materiais de referencia'. Clique no nome do arquivo PDF."
-                )
-                if pdf_abriu:
-                    await asyncio.sleep(3)
-
-            if not pdf_abriu:
-                log("  Nao conseguiu abrir o PDF", config.nome)
-                raise Exception("PDF nao abriu")
-
-            # Espera o preview carregar completamente
-            log("  Aguardando preview carregar...", config.nome)
-
-            try:
-                await browser.page.wait_for_load_state("networkidle", timeout=20000)
-            except Exception:
-                pass
-            await asyncio.sleep(5)
-
-            # NOVO: Tenta baixar o arquivo antes de tirar screenshots
-            download_ok = False
-            arquivo_baixado = await baixar_arquivo_do_teams(browser, agent, config, data_dir)
+            # ESTRATÉGIA 1: Download direto via menu "..." (SEM abrir preview)
+            arquivo_baixado = await baixar_arquivo_sem_preview(browser, agent, config, data_dir, ".pdf")
 
             if arquivo_baixado and arquivo_baixado.exists():
-                log(f"  Download do PDF bem-sucedido: {arquivo_baixado.name}", config.nome)
+                log(f"  Download direto do PDF bem-sucedido: {arquivo_baixado.name}", config.nome)
                 conteudo = extrair_conteudo_arquivo(arquivo_baixado)
 
                 if conteudo and conteudo.get("texto", "").strip():
                     tarefa_info["texto_extraido"] = conteudo["texto"]
                     log(f"  Texto extraido: {len(conteudo['texto'])} chars, {conteudo.get('paginas', 0)} paginas", config.nome)
 
-                    # Base64 do PDF para envio nativo ao Claude
                     if conteudo.get("base64_data"):
                         tarefa_info.setdefault("pdf_base64", []).append(conteudo["base64_data"])
                         log("  PDF base64 salvo para envio nativo ao Claude", config.nome)
@@ -905,15 +887,85 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
                     tarefa_info.setdefault("arquivos_baixados", []).append(str(arquivo_baixado))
                     download_ok = True
                 else:
-                    log("  Download OK mas extracao de texto falhou, usando screenshots", config.nome)
+                    log("  Download OK mas extracao de texto falhou", config.nome)
+
+            # ESTRATÉGIA 2: Abre preview e tenta baixar pela toolbar
+            if not download_ok:
+                log("  Download direto falhou, abrindo preview...", config.nome)
+                pdf_abriu = False
+
+                try:
+                    pdf_link = frame.locator('text=/.pdf/i').first
+                    await pdf_link.click(timeout=5000)
+                    await asyncio.sleep(3)
+                    pdf_abriu = True
+                except Exception:
+                    log("  CSS falhou para PDF, tentando Vision...", config.nome)
+
+                if not pdf_abriu and agent:
+                    pdf_abriu = await agent._clicar_com_visao(
+                        "Arquivo PDF na secao 'Reference materials' ou 'Materiais de referencia'. Clique no nome do arquivo PDF."
+                    )
+                    if pdf_abriu:
+                        await asyncio.sleep(3)
+
+                if pdf_abriu:
+                    try:
+                        await browser.page.wait_for_load_state("networkidle", timeout=20000)
+                    except Exception:
+                        pass
+                    await asyncio.sleep(5)
+
+                    # Tenta baixar do preview
+                    arquivo_baixado = await baixar_arquivo_do_preview(browser, agent, config, data_dir)
+
+                    if arquivo_baixado and arquivo_baixado.exists():
+                        log(f"  Download do preview bem-sucedido: {arquivo_baixado.name}", config.nome)
+                        conteudo = extrair_conteudo_arquivo(arquivo_baixado)
+
+                        if conteudo and conteudo.get("texto", "").strip():
+                            tarefa_info["texto_extraido"] = conteudo["texto"]
+                            log(f"  Texto extraido: {len(conteudo['texto'])} chars, {conteudo.get('paginas', 0)} paginas", config.nome)
+
+                            if conteudo.get("base64_data"):
+                                tarefa_info.setdefault("pdf_base64", []).append(conteudo["base64_data"])
+                                log("  PDF base64 salvo para envio nativo ao Claude", config.nome)
+
+                            tarefa_info.setdefault("arquivos_baixados", []).append(str(arquivo_baixado))
+                            download_ok = True
 
             if download_ok:
-                # Download e extracao OK, fecha preview
+                # Download OK, fecha preview se estiver aberto
                 await fechar_preview(browser)
                 frame = await recuperar_frame_tarefa(browser, frame, nome_tarefa, disciplina, agent)
             else:
-                # FALLBACK: screenshots (fluxo original)
+                # ESTRATÉGIA 3: Screenshots (fallback final)
                 log("  Usando fallback de screenshots para PDF...", config.nome)
+
+                # Garante que o preview está aberto para screenshots
+                pdf_abriu = False
+                try:
+                    # Verifica se já tem conteúdo de PDF visível
+                    await browser.page.wait_for_selector('[class*="pdf"], [class*="preview"]', timeout=2000)
+                    pdf_abriu = True
+                except Exception:
+                    # Precisa abrir o preview
+                    try:
+                        pdf_link = frame.locator('text=/.pdf/i').first
+                        await pdf_link.click(timeout=5000)
+                        await asyncio.sleep(5)
+                        pdf_abriu = True
+                    except Exception:
+                        if agent:
+                            pdf_abriu = await agent._clicar_com_visao(
+                                "Arquivo PDF na secao 'Reference materials'. Clique no nome do arquivo PDF."
+                            )
+                            if pdf_abriu:
+                                await asyncio.sleep(5)
+
+                if not pdf_abriu:
+                    log("  Nao conseguiu abrir o PDF para screenshots", config.nome)
+                    raise Exception("PDF nao abriu")
 
                 # Espera adicional para garantir que o conteudo renderizou
                 await asyncio.sleep(5)
@@ -1060,21 +1112,17 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
             if ext not in content_lower:
                 continue
             try:
-                # Encontra e clica no documento para abrir preview
-                doc_link = frame.locator(f'text=/{re.escape(ext)}/i').first
-                await doc_link.click(timeout=10000)
-                await asyncio.sleep(5)
-
-                # Tenta baixar o arquivo
                 download_ok = False
-                arquivo_baixado = await baixar_arquivo_do_teams(browser, agent, config, data_dir)
+                arquivo_baixado = None
+
+                # ESTRATÉGIA 1: Download direto via menu "..." (SEM abrir preview)
+                arquivo_baixado = await baixar_arquivo_sem_preview(browser, agent, config, data_dir, ext)
 
                 if arquivo_baixado and arquivo_baixado.exists():
-                    log(f"  Download de {ext} bem-sucedido: {arquivo_baixado.name}", config.nome)
+                    log(f"  Download direto de {ext} bem-sucedido: {arquivo_baixado.name}", config.nome)
                     conteudo = extrair_conteudo_arquivo(arquivo_baixado)
 
                     if conteudo and conteudo.get("texto", "").strip():
-                        # Acumula texto extraido
                         texto_anterior = tarefa_info.get("texto_extraido", "")
                         separador = "\n\n" if texto_anterior else ""
                         tarefa_info["texto_extraido"] = texto_anterior + separador + conteudo["texto"]
@@ -1082,43 +1130,90 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
 
                         tarefa_info.setdefault("arquivos_baixados", []).append(str(arquivo_baixado))
                         download_ok = True
-                    else:
-                        log(f"  Download OK mas extracao falhou para {ext}, usando screenshots", config.nome)
+
+                # ESTRATÉGIA 2: Abre preview e tenta baixar pela toolbar
+                if not download_ok:
+                    log(f"  Download direto falhou, abrindo preview para {ext}...", config.nome)
+                    doc_abriu = False
+
+                    try:
+                        doc_link = frame.locator(f'text=/{re.escape(ext)}/i').first
+                        await doc_link.click(timeout=10000)
+                        await asyncio.sleep(5)
+                        doc_abriu = True
+                    except Exception:
+                        log(f"  CSS falhou para {ext}, tentando Vision...", config.nome)
+                        if agent:
+                            doc_abriu = await agent._clicar_com_visao(
+                                f"Arquivo {ext.upper()} na secao 'Reference materials'. Clique no nome do arquivo."
+                            )
+                            if doc_abriu:
+                                await asyncio.sleep(5)
+
+                    if doc_abriu:
+                        arquivo_baixado = await baixar_arquivo_do_preview(browser, agent, config, data_dir)
+
+                        if arquivo_baixado and arquivo_baixado.exists():
+                            log(f"  Download do preview de {ext} bem-sucedido: {arquivo_baixado.name}", config.nome)
+                            conteudo = extrair_conteudo_arquivo(arquivo_baixado)
+
+                            if conteudo and conteudo.get("texto", "").strip():
+                                texto_anterior = tarefa_info.get("texto_extraido", "")
+                                separador = "\n\n" if texto_anterior else ""
+                                tarefa_info["texto_extraido"] = texto_anterior + separador + conteudo["texto"]
+                                log(f"  Texto extraido de {ext}: {len(conteudo['texto'])} chars", config.nome)
+
+                                tarefa_info.setdefault("arquivos_baixados", []).append(str(arquivo_baixado))
+                                download_ok = True
 
                 if download_ok:
                     await fechar_preview(browser)
                     frame = await recuperar_frame_tarefa(browser, frame, nome_tarefa, disciplina, agent)
                 else:
-                    # FALLBACK: screenshots (fluxo original)
+                    # ESTRATÉGIA 3: Screenshots (fallback final)
                     log(f"  Usando fallback de screenshots para {ext}...", config.nome)
-                    await asyncio.sleep(5)  # Espera preview carregar
 
-                    max_doc_pages = 10
-                    ultimo_hash = None
-                    for page_num in range(1, max_doc_pages + 1):
-                        ss_path = data_dir / f"doc_{ext.replace('.', '')}_{page_num}.png"
-                        await browser.page.screenshot(path=str(ss_path))
-
-                        with open(ss_path, "rb") as f:
-                            current_hash = hashlib.md5(f.read()).hexdigest()
-
-                        if current_hash == ultimo_hash:
-                            log(f"  Pagina {page_num} igual a anterior, fim do documento", config.nome)
-                            ss_path.unlink()
-                            break
-
-                        ultimo_hash = current_hash
-                        tarefa_info["screenshots"].append(str(ss_path))
-                        log(f"  Screenshot {page_num} do documento capturado", config.nome)
-
+                    # Garante que o preview está aberto
+                    doc_abriu = False
+                    try:
+                        await browser.page.wait_for_selector('[class*="preview"], [class*="document"]', timeout=2000)
+                        doc_abriu = True
+                    except Exception:
                         try:
-                            for _ in range(15):
-                                await browser.page.keyboard.press("ArrowDown")
-                                await asyncio.sleep(0.1)
-                            await browser.page.mouse.wheel(0, 500)
-                            await asyncio.sleep(1)
+                            doc_link = frame.locator(f'text=/{re.escape(ext)}/i').first
+                            await doc_link.click(timeout=10000)
+                            await asyncio.sleep(5)
+                            doc_abriu = True
                         except Exception:
-                            break
+                            pass
+
+                    if doc_abriu:
+                        max_doc_pages = 10
+                        ultimo_hash = None
+                        for page_num in range(1, max_doc_pages + 1):
+                            ss_path = data_dir / f"doc_{ext.replace('.', '')}_{page_num}.png"
+                            await browser.page.screenshot(path=str(ss_path))
+
+                            with open(ss_path, "rb") as f:
+                                current_hash = hashlib.md5(f.read()).hexdigest()
+
+                            if current_hash == ultimo_hash:
+                                log(f"  Pagina {page_num} igual a anterior, fim do documento", config.nome)
+                                ss_path.unlink()
+                                break
+
+                            ultimo_hash = current_hash
+                            tarefa_info["screenshots"].append(str(ss_path))
+                            log(f"  Screenshot {page_num} do documento capturado", config.nome)
+
+                            try:
+                                for _ in range(15):
+                                    await browser.page.keyboard.press("ArrowDown")
+                                    await asyncio.sleep(0.1)
+                                await browser.page.mouse.wheel(0, 500)
+                                await asyncio.sleep(1)
+                            except Exception:
+                                break
 
                     await fechar_preview(browser)
                     frame = await recuperar_frame_tarefa(browser, frame, nome_tarefa, disciplina, agent)
@@ -1270,8 +1365,10 @@ CONTEUDO DO ARQUIVO {arquivo_externo}:
         try:
             file_input = frame.locator('input[type="file"]').first
             await file_input.set_input_files(arquivos)
+            log(f"  Arquivo(s) anexado(s): {[Path(a).name for a in arquivos]}", config.nome)
             await asyncio.sleep(3)
-        except Exception:
+        except Exception as e:
+            log(f"  Erro no upload: {e}", config.nome)
             try:
                 text_area = frame.locator('textarea, [contenteditable="true"]').first
                 await text_area.fill(resposta[:5000])
@@ -1284,6 +1381,7 @@ CONTEUDO DO ARQUIVO {arquivo_externo}:
         try:
             text_area = frame.locator('textarea, [contenteditable="true"]').first
             await text_area.fill(resposta[:5000])
+            log("  Texto preenchido", config.nome)
         except Exception:
             try:
                 file_input = frame.locator('input[type="file"]').first
@@ -1294,6 +1392,33 @@ CONTEUDO DO ARQUIVO {arquivo_externo}:
                 resultado["format"] = formato
                 resultado["error"] = "Falha ao preencher texto"
                 return resultado
+
+    # Verifica se tem alerta de erro após upload
+    await asyncio.sleep(2)
+    try:
+        alert = browser.page.locator('div[role="alert"], div.alert-container, div[class*="danger-alert"]').first
+        if await alert.is_visible(timeout=1000):
+            try:
+                erro_msg = await alert.inner_text(timeout=2000)
+                log(f"  ALERTA detectado após upload: {erro_msg[:100]}", config.nome)
+            except Exception:
+                erro_msg = "Alerta de erro detectado"
+
+            # Tenta fechar o alerta
+            try:
+                close_btn = alert.locator('button, [aria-label*="Close"], [aria-label*="Fechar"]').first
+                await close_btn.click(timeout=2000)
+                log("  Alerta fechado", config.nome)
+            except Exception:
+                try:
+                    await browser.page.keyboard.press("Escape")
+                    log("  Alerta fechado via Escape", config.nome)
+                except Exception:
+                    pass
+
+            await asyncio.sleep(1)
+    except Exception:
+        pass  # Nenhum alerta visível, continua normalmente
 
     # Submit (apenas se não for anexar_apenas)
     if anexar_apenas:
@@ -1348,15 +1473,41 @@ CONTEUDO DO ARQUIVO {arquivo_externo}:
         return resultado
 
     # Submit normal
+    log("  Tentando enviar resposta...", config.nome)
     try:
-        submit = frame.locator(
-            'button:has-text("Turn in again"), button:has-text("Entregar novamente"), '
-            'button:has-text("Turn in late"), button:has-text("Entregar com atraso"), '
-            'button:has-text("Turn in"), button:has-text("Entregar")'
-        ).first
-        await submit.click(timeout=5000)
+        # Tenta clicar em Turn in, com retry se alerta bloquear
+        submit_ok = False
+        for tentativa in range(3):
+            try:
+                submit = frame.locator(
+                    'button:has-text("Turn in again"), button:has-text("Entregar novamente"), '
+                    'button:has-text("Turn in late"), button:has-text("Entregar com atraso"), '
+                    'button:has-text("Turn in"), button:has-text("Entregar")'
+                ).first
+                await submit.click(timeout=5000)
+                submit_ok = True
+                break
+            except Exception as e:
+                if "intercepts pointer events" in str(e) or "alert" in str(e).lower():
+                    log(f"  Alerta bloqueando submit (tentativa {tentativa + 1}/3), fechando...", config.nome)
+                    # Tenta fechar qualquer alerta
+                    try:
+                        alert = browser.page.locator('div[role="alert"], div.alert-container, div[class*="danger-alert"]').first
+                        if await alert.is_visible(timeout=1000):
+                            close_btn = alert.locator('button, [aria-label*="Close"]').first
+                            await close_btn.click(timeout=2000)
+                    except Exception:
+                        await browser.page.keyboard.press("Escape")
+                    await asyncio.sleep(2)
+                else:
+                    raise e
+
+        if not submit_ok:
+            raise Exception("Nao conseguiu clicar em Turn in apos 3 tentativas")
+
         await asyncio.sleep(2)
 
+        # Confirmação (modal de Turn in)
         try:
             confirm = browser.page.locator(
                 'button:has-text("Turn in again"), button:has-text("Entregar novamente"), '
@@ -1364,6 +1515,7 @@ CONTEUDO DO ARQUIVO {arquivo_externo}:
                 'button:has-text("Turn in"), button:has-text("Entregar")'
             ).first
             await confirm.click(timeout=3000)
+            log("  Confirmação clicada", config.nome)
         except Exception:
             pass
 
