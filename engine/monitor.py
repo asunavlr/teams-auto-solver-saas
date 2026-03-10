@@ -1363,11 +1363,13 @@ CONTEUDO DO ARQUIVO {arquivo_externo}:
             f.write(resposta)
         arquivos = [path]
 
-    # Atualiza frame antes de enviar
-    for f in browser.page.frames:
-        if "assignments" in f.url.lower():
-            frame = f
-            break
+    # Garante que está na tela da tarefa antes de enviar
+    log("  Navegando de volta para a tarefa...", config.nome)
+    frame = await recuperar_frame_tarefa(browser, frame, nome_tarefa, disciplina, agent, reabrir_tarefa=True)
+    await asyncio.sleep(3)
+
+    # Screenshot para debug
+    await browser.page.screenshot(path=str(data_dir / "antes_anexar.png"))
 
     # Clica em Adicionar trabalho / Attach
     log("  Buscando botao de anexar arquivo...", config.nome)
