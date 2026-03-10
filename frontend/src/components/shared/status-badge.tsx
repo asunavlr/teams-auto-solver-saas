@@ -22,6 +22,7 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
   skipped_external: { label: "Recurso externo", variant: "default", className: "bg-indigo-500/15 text-indigo-400 border-indigo-500/20 hover:bg-indigo-500/15" },
   skipped_presence: { label: "Presencial", variant: "default", className: "bg-teal-500/15 text-teal-400 border-teal-500/20 hover:bg-teal-500/15" },
   skipped_uncertain: { label: "Incerto", variant: "default", className: "bg-amber-500/15 text-amber-500 border-amber-500/20 hover:bg-amber-500/15" },
+  skipped_already_submitted: { label: "Já entregue", variant: "default", className: "bg-sky-500/15 text-sky-400 border-sky-500/20 hover:bg-sky-500/15" },
 }
 
 interface StatusBadgeProps {
@@ -41,7 +42,8 @@ export function StatusBadge({ status, showDot = true }: StatusBadgeProps) {
     config.className.includes("indigo") ? "bg-indigo-400" :
     config.className.includes("teal") ? "bg-teal-400" :
     config.className.includes("orange") ? "bg-orange-400" :
-    config.className.includes("violet") ? "bg-violet-400" : "bg-zinc-400"
+    config.className.includes("violet") ? "bg-violet-400" :
+    config.className.includes("sky") ? "bg-sky-400" : "bg-zinc-400"
 
   return (
     <Badge variant={config.variant} className={config.className}>
