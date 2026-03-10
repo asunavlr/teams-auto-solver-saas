@@ -640,7 +640,7 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
     """Processa uma nova atividade para um cliente.
 
     Retorna dict com:
-        - status: 'success', 'skipped', 'not_found', 'group', 'error'
+        - status: 'success', 'skipped', 'skipped_already_submitted', 'not_found', 'group_ready', 'ready_manual', 'error'
         - format: formato do arquivo (docx, pdf, etc)
         - error: mensagem de erro se houver
     """
@@ -656,17 +656,15 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
         resultado["error"] = "Tipo nao suportado"
         return resultado
 
-    # Detecta atividades OBRIGATORIAMENTE em grupo (pula automaticamente)
-    # Só pula se tiver "em grupo", "em equipe", etc. - ignora "pode ser em dupla"
+    # Detecta atividades em grupo - resolve mas NÃO envia automaticamente
     nome_lower = nome_tarefa.lower()
     frases_grupo_obrigatorio = [
         "trabalho em grupo", "atividade em grupo", "em equipe", "trabalho em equipe",
         "atividade em equipe", "entrega em grupo", "fazer em grupo"
     ]
-    if any(frase in nome_lower for frase in frases_grupo_obrigatorio):
-        log(f"  Atividade em GRUPO detectada, pulando: {nome_tarefa}", config.nome)
-        resultado["status"] = "group"
-        return resultado
+    eh_grupo = any(frase in nome_lower for frase in frases_grupo_obrigatorio)
+    if eh_grupo:
+        log(f"  Atividade em GRUPO detectada no nome - vai resolver mas NÃO enviar", config.nome)
 
     # Clica em Atribuicoes
     try:
@@ -807,6 +805,24 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
             log(f"  Vision falhou: {e}", config.nome)
 
     if not tarefa_encontrada:
+        # Verifica se já está em Completed (entregue manualmente pelo aluno)
+        log(f"Tarefa nao encontrada em pendentes, verificando Completed...", config.nome)
+
+        for tab in ["Completed", "Concluído", "Concluido", "Done"]:
+            try:
+                tab_btn = frame.locator(f'text="{tab}"').first
+                await tab_btn.click(timeout=3000)
+                await asyncio.sleep(2)
+
+                if await buscar_tarefa_no_frame(frame, nome_tarefa, disciplina, agent):
+                    log(f"Tarefa encontrada em {tab} - ja foi entregue pelo aluno!", config.nome)
+                    resultado["status"] = "skipped_already_submitted"
+                    resultado["error"] = "Tarefa ja entregue manualmente pelo aluno"
+                    return resultado
+            except Exception:
+                continue
+
+        # Não encontrou em lugar nenhum
         log(f"Tarefa nao encontrada: {nome_tarefa}", config.nome)
         resultado["status"] = "not_found"
         return resultado
@@ -847,11 +863,9 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
         "grupo de ate", "grupo de até", "equipe de ate", "equipe de até",
         "formar grupo", "formar equipe", "formem grupo", "formem equipe"
     ]
-    if any(frase in texto_verificar for frase in frases_grupo):
-        log(f"  Atividade em GRUPO detectada nas instrucoes, pulando!", config.nome)
-        await fechar_preview(browser)
-        resultado["status"] = "group"
-        return resultado
+    if not eh_grupo and any(frase in texto_verificar for frase in frases_grupo):
+        log(f"  Atividade em GRUPO detectada nas instrucoes - vai resolver mas NÃO enviar", config.nome)
+        eh_grupo = True
 
     # Screenshot da tarefa
     screenshot_path = data_dir / "tarefa_nova.png"
@@ -1304,9 +1318,12 @@ CONTEUDO DO ARQUIVO {arquivo_externo}:
         log("  ⚠️ Tarefa marcada para revisao (confianca baixa)", config.nome)
 
     # Flag para anexar apenas (não enviar automaticamente)
-    anexar_apenas = analise.get("anexar_apenas", False)
-    if anexar_apenas:
+    # Inclui atividades em grupo - resolve mas não envia
+    anexar_apenas = analise.get("anexar_apenas", False) or eh_grupo
+    if anexar_apenas and not eh_grupo:
         log("  📎 Tarefa será resolvida mas NÃO enviada (requer envio manual)", config.nome)
+    elif eh_grupo:
+        log("  👥 Atividade em GRUPO - será resolvida e anexada, mas NÃO enviada", config.nome)
 
     # Resolve com Claude
     log("Enviando para Claude...", config.nome)
@@ -1352,26 +1369,99 @@ CONTEUDO DO ARQUIVO {arquivo_externo}:
             frame = f
             break
 
-    # Clica em Adicionar trabalho
-    try:
-        add_work = frame.locator('text=/Add work/i, text=/Adicionar trabalho/i').first
-        await add_work.click(timeout=5000)
-        await asyncio.sleep(2)
-    except Exception:
-        pass
+    # Clica em Adicionar trabalho / Attach
+    log("  Buscando botao de anexar arquivo...", config.nome)
+    attach_clicado = False
 
-    # Upload ou texto
-    if formato != "texto":
+    # Tenta CSS primeiro
+    attach_selectors = [
+        'text=/Add work/i', 'text=/Adicionar trabalho/i',
+        'text=/Attach/i', 'text=/Anexar/i',
+        'button:has-text("Attach")', 'button:has-text("Anexar")',
+        '[aria-label*="Attach"]', '[aria-label*="Anexar"]',
+    ]
+    for selector in attach_selectors:
         try:
+            btn = frame.locator(selector).first
+            await btn.click(timeout=3000)
+            attach_clicado = True
+            log(f"  Botao encontrado via CSS: {selector}", config.nome)
+            break
+        except Exception:
+            continue
+
+    # Fallback: Vision para encontrar botão de anexar
+    if not attach_clicado and agent:
+        log("  CSS falhou, usando Vision para encontrar botao de anexar...", config.nome)
+        attach_clicado = await agent._clicar_com_visao(
+            "Botao 'Attach' ou 'Anexar' ou '+Add work' na secao 'My work' ou 'Meu trabalho'. "
+            "Pode ser um botao com icone de clipe ou texto 'Attach file'."
+        )
+
+    if attach_clicado:
+        await asyncio.sleep(2)
+    else:
+        log("  AVISO: Botao de anexar nao encontrado, tentando upload direto...", config.nome)
+
+    # Upload do arquivo
+    if formato != "texto":
+        upload_ok = False
+
+        # Tenta encontrar input de arquivo
+        try:
+            # Primeiro tenta no frame de assignments
             file_input = frame.locator('input[type="file"]').first
-            await file_input.set_input_files(arquivos)
-            log(f"  Arquivo(s) anexado(s): {[Path(a).name for a in arquivos]}", config.nome)
+            await file_input.set_input_files(arquivos, timeout=10000)
+            upload_ok = True
+            log(f"  Arquivo(s) enviado(s): {[Path(a).name for a in arquivos]}", config.nome)
+        except Exception:
+            # Tenta na página principal
+            try:
+                file_input = browser.page.locator('input[type="file"]').first
+                await file_input.set_input_files(arquivos, timeout=10000)
+                upload_ok = True
+                log(f"  Arquivo(s) enviado(s) (pagina principal): {[Path(a).name for a in arquivos]}", config.nome)
+            except Exception as e:
+                log(f"  Erro no upload: {e}", config.nome)
+
+        if upload_ok:
             await asyncio.sleep(3)
-        except Exception as e:
-            log(f"  Erro no upload: {e}", config.nome)
+
+            # Verifica com Vision se o arquivo foi anexado
+            if agent:
+                log("  Verificando se arquivo foi anexado...", config.nome)
+                try:
+                    screenshot = await browser.page.screenshot(type="png")
+                    import base64
+                    img_base64 = base64.b64encode(screenshot).decode()
+
+                    from anthropic import Anthropic
+                    client = Anthropic(api_key=config.anthropic_key)
+                    response = client.messages.create(
+                        model="claude-sonnet-4-20250514",
+                        max_tokens=100,
+                        messages=[{
+                            "role": "user",
+                            "content": [
+                                {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": img_base64}},
+                                {"type": "text", "text": "Na secao 'My work' desta tela, existe algum arquivo anexado (mostrando nome de arquivo como .zip, .java, .docx, etc)? Responda apenas YES ou NO."}
+                            ]
+                        }]
+                    )
+                    arquivo_anexado = "YES" in response.content[0].text.upper()
+                    log(f"  Verificacao de anexo: {'OK' if arquivo_anexado else 'NAO ENCONTRADO'}", config.nome)
+
+                    if not arquivo_anexado:
+                        log("  AVISO: Arquivo pode nao ter sido anexado corretamente", config.nome)
+                except Exception as e:
+                    log(f"  Erro na verificacao de anexo: {e}", config.nome)
+        else:
+            # Fallback: tenta textarea
+            log("  Tentando fallback para textarea...", config.nome)
             try:
                 text_area = frame.locator('textarea, [contenteditable="true"]').first
                 await text_area.fill(resposta[:5000])
+                log("  Texto preenchido como fallback", config.nome)
             except Exception:
                 resultado["status"] = "error"
                 resultado["format"] = formato
@@ -1438,11 +1528,14 @@ CONTEUDO DO ARQUIVO {arquivo_externo}:
                     smtp_password=config.smtp_password,
                     to_email=config.notification_email,
                 )
-                notifier.notify_tarefa_resolvida(
-                    nome_tarefa, disciplina,
-                    f"[ATENÇÃO: Envio manual necessário]\n\nA tarefa foi resolvida e o arquivo anexado, "
-                    f"mas requer envio manual (ex: via repositório GitHub).\n\n{resposta[:500]}"
-                )
+                if eh_grupo:
+                    msg = (f"[ATIVIDADE EM GRUPO - Envio manual necessário]\n\n"
+                           f"A tarefa foi resolvida e o arquivo anexado, mas é uma atividade em grupo.\n"
+                           f"Coordene com seu grupo e envie manualmente.\n\n{resposta[:500]}")
+                else:
+                    msg = (f"[ATENÇÃO: Envio manual necessário]\n\nA tarefa foi resolvida e o arquivo anexado, "
+                           f"mas requer envio manual (ex: via repositório GitHub).\n\n{resposta[:500]}")
+                notifier.notify_tarefa_resolvida(nome_tarefa, disciplina, msg)
             except Exception:
                 pass
 
@@ -1462,7 +1555,7 @@ CONTEUDO DO ARQUIVO {arquivo_externo}:
                 await asyncio.sleep(1)
 
         await asyncio.sleep(3)
-        resultado["status"] = "ready_manual"
+        resultado["status"] = "group_ready" if eh_grupo else "ready_manual"
         resultado["format"] = formato
         resultado["instrucoes"] = tarefa_info.get("instrucoes", "")
         resultado["resposta"] = resposta
@@ -1702,7 +1795,7 @@ async def ciclo_monitoramento_cliente(config: ClientConfig) -> dict:
                         salvar_tentativas_falhas(tentativas_falhas, config.processadas_path)
 
                     elif res["status"] != "error":
-                        # Sucesso, skipped, group - marca como processada
+                        # Sucesso, skipped, group_ready, ready_manual - marca como processada
                         processadas[atividade_id] = {
                             "nome": atividade.get("nome", ""),
                             "disciplina": atividade.get("disciplina", ""),
@@ -1725,12 +1818,13 @@ async def ciclo_monitoramento_cliente(config: ClientConfig) -> dict:
                     }
                     resultado["tasks"].append(task_result)
 
-                    if res["status"] == "success":
+                    # Conta como sucesso: success, success_flagged, group_ready, ready_manual
+                    if res["status"] in ["success", "success_flagged", "group_ready", "ready_manual"]:
                         resultado["success"] += 1
                         tarefas_processadas_ciclo += 1  # Conta para o limite
                     elif res["status"] == "error":
                         resultado["error"] += 1
-                    # skipped, not_found, group não contam como erro nem para o limite
+                    # skipped, not_found não contam como erro nem para o limite
 
                 except Exception as e:
                     log(f"Erro ao processar: {e}", config.nome)
