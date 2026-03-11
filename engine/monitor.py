@@ -1372,62 +1372,7 @@ CONTEUDO DO ARQUIVO {arquivo_externo}:
     await browser.page.keyboard.press("Escape")
     await asyncio.sleep(1)
 
-    # Scroll até a seção "My work" (pode estar abaixo na tela)
-    log("  Scrollando ate 'My work'...", config.nome)
-    try:
-        my_work = frame.locator('text=/My work/i, text=/Meu trabalho/i').first
-        await my_work.scroll_into_view_if_needed(timeout=5000)
-        await asyncio.sleep(1)
-    except Exception:
-        # Se não achar, tenta scroll genérico
-        try:
-            await frame.evaluate("window.scrollBy(0, 500)")
-        except Exception:
-            pass
-        await asyncio.sleep(1)
-
-    # Screenshot para debug
-    await browser.page.screenshot(path=str(data_dir / "antes_anexar.png"))
-
-    # Clica em Adicionar trabalho / Attach
-    log("  Buscando botao de anexar arquivo...", config.nome)
-    attach_clicado = False
-
-    # Tenta CSS primeiro - incluindo mais seletores
-    attach_selectors = [
-        'text=/Add work/i', 'text=/Adicionar trabalho/i',
-        'text=/Attach/i', 'text=/Anexar/i',
-        'text=/\\+ Add work/i', 'text=/\\+ Adicionar/i',
-        'button:has-text("Attach")', 'button:has-text("Anexar")',
-        'button:has-text("Add work")', 'button:has-text("Adicionar trabalho")',
-        '[aria-label*="Attach"]', '[aria-label*="Anexar"]',
-        '[aria-label*="Add work"]', '[aria-label*="Adicionar trabalho"]',
-    ]
-    for selector in attach_selectors:
-        try:
-            btn = frame.locator(selector).first
-            await btn.click(timeout=2000)
-            attach_clicado = True
-            log(f"  Botao encontrado via CSS: {selector}", config.nome)
-            break
-        except Exception:
-            continue
-
-    # Fallback: Vision para encontrar botão de anexar
-    if not attach_clicado and agent:
-        log("  CSS falhou, usando Vision para encontrar botao de anexar...", config.nome)
-        attach_clicado = await agent._clicar_com_visao(
-            "Botao para anexar arquivo na secao 'My work'. Pode ser um botao com texto "
-            "'+ Add work', 'Attach', 'Anexar', ou um icone de clipe/mais (+). "
-            "Geralmente fica abaixo de 'My work' ou 'Meu trabalho'. Se precisar, faca scroll para baixo."
-        )
-
-    if attach_clicado:
-        await asyncio.sleep(2)
-    else:
-        log("  AVISO: Botao de anexar nao encontrado, tentando upload direto...", config.nome)
-
-    # Upload do arquivo
+    # Upload do arquivo (automático via input file)
     if formato != "texto":
         upload_ok = False
 
