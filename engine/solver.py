@@ -713,8 +713,13 @@ CATEGORIAS:
 5. GRUPO - Requer formacao de equipe ou decisao coletiva
    Exemplos: escolher grupo, definir tema com a equipe, cadastro de integrantes
 
-6. RECURSO_EXTERNO - Requer algo que o ALUNO JA PRECISA TER pronto (nao podemos criar)
+6. RECURSO_EXTERNO - Requer algo que o ALUNO JA PRECISA TER pronto OU ferramenta visual externa
    Exemplos: "envie o link do SEU portfolio existente", "link do SEU video JA GRAVADO no YouTube"
+   TAMBEM INCLUI tarefas que exigem FERRAMENTAS VISUAIS/DESIGN que nao conseguimos gerar:
+   - Wireframes/rabiscoframes/mockups usando: Excalidraw, Balsamiq, Figma, Adobe XD, Sketch, Canva
+   - Diagramas interativos: Draw.io, Lucidchart, Miro, Whimsical
+   - Prototipos de interface, telas de aplicativo, fluxogramas visuais
+   - Qualquer tarefa que peca "entre 5 e 10 telas", "crie wireframes", "modele a interface"
    IMPORTANTE: Se podemos CRIAR o conteudo mas precisa de repo, use RESOLVIVEL_MANUAL
    IMPORTANTE: NAO e recurso externo se for apenas acessar material do professor
 
@@ -732,6 +737,8 @@ REGRAS DE DECISAO:
 - Se pede QUALQUER tipo de documento/texto/codigo como resposta E pode anexar direto, e RESOLVIVEL
 - SE PEDE CRIAR CODIGO/ARQUIVO + ENTREGAR VIA REPOSITORIO/GITHUB, e RESOLVIVEL_MANUAL
 - Se pede algo que o aluno JA PRECISA TER (video gravado, portfolio existente), e RECURSO_EXTERNO
+- Se menciona ferramentas como Excalidraw, Balsamiq, Figma, Canva, Draw.io, Miro para criar wireframes/mockups/prototipos, e RECURSO_EXTERNO
+- Se pede "crie X telas", "modele a interface", "faca wireframes/rabiscoframes", e RECURSO_EXTERNO
 - Apenas classifique como nao-resolvivel se tiver CERTEZA que se encaixa nas outras categorias
 - Na duvida entre RESOLVIVEL e RESOLVIVEL_MANUAL, escolha RESOLVIVEL_MANUAL se mencionar repositorio
 
