@@ -176,6 +176,14 @@ def get_log_detail(log_id):
         except (json.JSONDecodeError, TypeError):
             arquivos = []
 
+    # Parse debug_data se existir
+    debug = None
+    if log.debug_data:
+        try:
+            debug = json.loads(log.debug_data)
+        except (json.JSONDecodeError, TypeError):
+            debug = None
+
     return jsonify({
         "id": log.id,
         "client_id": log.client_id,
@@ -189,6 +197,7 @@ def get_log_detail(log_id):
         "instrucoes": log.instrucoes or "",
         "resposta": log.resposta or "",
         "arquivos_enviados": arquivos,
+        "debug": debug,
     })
 
 

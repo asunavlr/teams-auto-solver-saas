@@ -1,6 +1,6 @@
 import { useState, type ChangeEvent } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { FileText, MessageSquare, Files, Undo2, Loader2, Download, Upload, X } from "lucide-react"
+import { FileText, MessageSquare, Files, Undo2, Loader2, Download, Upload, X, Bug, Monitor, AlertTriangle } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
@@ -163,20 +163,26 @@ export function ActivityDetailDialog({
               </div>
 
               {/* Tabs for Instructions and Response */}
-              <Tabs defaultValue="instrucoes" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
+              <Tabs defaultValue={logDetail.debug ? "debug" : "instrucoes"} className="w-full">
+                <TabsList className={`grid w-full ${logDetail.debug ? "grid-cols-4" : "grid-cols-3"}`}>
                   <TabsTrigger value="instrucoes" className="flex items-center gap-2">
                     <FileText className="h-4 w-4" />
                     Instrucoes
                   </TabsTrigger>
                   <TabsTrigger value="resposta" className="flex items-center gap-2">
                     <MessageSquare className="h-4 w-4" />
-                    Resposta Enviada
+                    Resposta
                   </TabsTrigger>
                   <TabsTrigger value="arquivos" className="flex items-center gap-2">
                     <Files className="h-4 w-4" />
                     Arquivos ({logDetail.arquivos_enviados?.length || 0})
                   </TabsTrigger>
+                  {logDetail.debug && (
+                    <TabsTrigger value="debug" className="flex items-center gap-2 text-destructive">
+                      <Bug className="h-4 w-4" />
+                      Debug
+                    </TabsTrigger>
+                  )}
                 </TabsList>
 
                 <TabsContent value="instrucoes" className="mt-4">
@@ -238,6 +244,94 @@ export function ActivityDetailDialog({
                     )}
                   </ScrollArea>
                 </TabsContent>
+
+                {/* Debug Tab - only shown when there's debug data */}
+                {logDetail.debug && (
+                  <TabsContent value="debug" className="mt-4">
+                    <div className="space-y-4">
+                      {/* Screenshot */}
+                      {logDetail.debug.screenshot && (
+                        <div className="space-y-2">
+                          <h4 className="text-sm font-medium flex items-center gap-2">
+                            <Monitor className="h-4 w-4" />
+                            Screenshot no momento do erro
+                          </h4>
+                          <div className="rounded-lg border overflow-hidden bg-muted/30">
+                            <img
+                              src={`data:image/png;base64,${logDetail.debug.screenshot}`}
+                              alt="Screenshot do erro"
+                              className="w-full h-auto max-h-[400px] object-contain"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Debug Info */}
+                      <div className="rounded-lg border p-4 space-y-3 bg-muted/30">
+                        <h4 className="text-sm font-medium flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4 text-destructive" />
+                          Informacoes de Debug
+                        </h4>
+
+                        <div className="grid gap-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Timestamp:</span>
+                            <span className="font-mono">{logDetail.debug.timestamp}</span>
+                          </div>
+
+                          {logDetail.debug.url && (
+                            <div className="flex flex-col gap-1">
+                              <span className="text-muted-foreground">URL:</span>
+                              <code className="text-xs bg-muted p-1 rounded break-all">{logDetail.debug.url}</code>
+                            </div>
+                          )}
+
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Botao Turn in visivel:</span>
+                            <span className={logDetail.debug.turn_in_visivel ? "text-green-500" : "text-red-500"}>
+                              {logDetail.debug.turn_in_visivel === null ? "?" : logDetail.debug.turn_in_visivel ? "Sim" : "Nao"}
+                            </span>
+                          </div>
+
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Botao Turn in habilitado:</span>
+                            <span className={logDetail.debug.turn_in_habilitado ? "text-green-500" : "text-red-500"}>
+                              {logDetail.debug.turn_in_habilitado === null ? "?" : logDetail.debug.turn_in_habilitado ? "Sim" : "Nao"}
+                            </span>
+                          </div>
+
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Alertas na tela:</span>
+                            <span className={logDetail.debug.alertas_count && logDetail.debug.alertas_count > 0 ? "text-orange-500 font-medium" : ""}>
+                              {logDetail.debug.alertas_count ?? "?"}
+                            </span>
+                          </div>
+
+                          {logDetail.debug.frames && logDetail.debug.frames.length > 0 && (
+                            <div className="flex flex-col gap-1">
+                              <span className="text-muted-foreground">Frames ({logDetail.debug.frames.length}):</span>
+                              <ul className="text-xs bg-muted p-2 rounded space-y-1 max-h-20 overflow-y-auto">
+                                {logDetail.debug.frames.map((frame, idx) => (
+                                  <li key={idx} className="font-mono truncate" title={frame}>{frame}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Page Content */}
+                      {logDetail.debug.conteudo && (
+                        <div className="space-y-2">
+                          <h4 className="text-sm font-medium">Conteudo visivel da pagina</h4>
+                          <ScrollArea className="h-[150px] rounded-md border p-3 bg-muted/30">
+                            <pre className="whitespace-pre-wrap text-xs font-mono">{logDetail.debug.conteudo}</pre>
+                          </ScrollArea>
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+                )}
               </Tabs>
 
               {/* Action Buttons */}

@@ -100,4 +100,16 @@ export interface TaskLogEntry {
   instrucoes?: string
   resposta?: string
   arquivos_enviados?: string[]
+  // Debug info (apenas quando status é erro)
+  debug?: {
+    erro: string
+    timestamp: string
+    screenshot: string | null  // base64
+    url: string | null
+    frames: string[]
+    conteudo: string | null
+    turn_in_visivel: boolean | null
+    turn_in_habilitado: boolean | null
+    alertas_count: number | null
+  } | null
 }

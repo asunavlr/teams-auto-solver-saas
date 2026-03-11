@@ -223,6 +223,9 @@ class TaskLog(db.Model):
     resposta = db.Column(db.Text, default="")  # Resposta gerada pelo Claude
     arquivos_enviados = db.Column(db.Text, default="")  # JSON com lista de arquivos
 
+    # Debug info (JSON com screenshot base64, url, frames, etc)
+    debug_data = db.Column(db.Text, default="")
+
 
 class Payment(db.Model):
     __tablename__ = "payments"

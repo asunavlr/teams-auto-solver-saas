@@ -1565,6 +1565,25 @@ CONTEUDO DO ARQUIVO {arquivo_externo}:
                     raise e
 
         if not submit_ok:
+            # Debug: captura estado antes de falhar
+            log("  DEBUG: Capturando estado da tela...", config.nome)
+            try:
+                debug_path = str(data_dir / f"debug_turnin_{datetime.now().strftime('%H%M%S')}.png")
+                await browser.page.screenshot(path=debug_path)
+                log(f"  DEBUG screenshot: {debug_path}", config.nome)
+
+                # Verifica estado do botão Turn in
+                submit_btn = frame.locator('button:has-text("Turn in"), button:has-text("Entregar")').first
+                is_visible = await submit_btn.is_visible()
+                is_enabled = await submit_btn.is_enabled()
+                log(f"  DEBUG Turn in - visivel: {is_visible}, habilitado: {is_enabled}", config.nome)
+
+                # Verifica se tem alertas
+                alerts = await browser.page.locator('div[role="alert"]').count()
+                log(f"  DEBUG alertas na tela: {alerts}", config.nome)
+            except Exception as debug_e:
+                log(f"  DEBUG erro: {debug_e}", config.nome)
+
             raise Exception("Nao conseguiu clicar em Turn in apos 3 tentativas")
 
         await asyncio.sleep(2)
@@ -1628,9 +1647,67 @@ CONTEUDO DO ARQUIVO {arquivo_externo}:
 
     except Exception as e:
         log(f"Erro ao enviar: {e}", config.nome)
+
+        debug_info = {
+            "erro": str(e),
+            "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            "screenshot": None,
+            "url": None,
+            "frames": [],
+            "conteudo": None,
+            "turn_in_visivel": None,
+            "turn_in_habilitado": None,
+            "alertas_count": None,
+        }
+
+        # Debug: salva screenshot e info da página no momento do erro
+        try:
+            erro_timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            erro_name = re.sub(r'[^\w]', '', nome_tarefa)[:20]
+
+            # Screenshot do erro (salva como base64 para exibir no frontend)
+            screenshot_bytes = await browser.page.screenshot(type="png")
+            import base64
+            debug_info["screenshot"] = base64.b64encode(screenshot_bytes).decode()
+
+            # Também salva arquivo
+            erro_screenshot = str(data_dir / f"ERRO_{erro_name}_{erro_timestamp}.png")
+            with open(erro_screenshot, "wb") as f:
+                f.write(screenshot_bytes)
+            log(f"  Screenshot do erro salvo: {erro_screenshot}", config.nome)
+
+            # Captura info da página
+            debug_info["url"] = browser.page.url
+            debug_info["frames"] = [frm.url[:100] for frm in browser.page.frames]
+
+            try:
+                content = await browser.page.inner_text("body")
+                debug_info["conteudo"] = content[:2000]
+            except Exception:
+                pass
+
+            # Estado do botão Turn in
+            try:
+                submit_btn = frame.locator('button:has-text("Turn in"), button:has-text("Entregar")').first
+                debug_info["turn_in_visivel"] = await submit_btn.is_visible()
+                debug_info["turn_in_habilitado"] = await submit_btn.is_enabled()
+            except Exception:
+                pass
+
+            # Conta alertas
+            try:
+                debug_info["alertas_count"] = await browser.page.locator('div[role="alert"]').count()
+            except Exception:
+                pass
+
+        except Exception as debug_e:
+            log(f"  Erro ao salvar debug: {debug_e}", config.nome)
+            debug_info["erro_debug"] = str(debug_e)
+
         resultado["status"] = "error"
         resultado["format"] = formato
         resultado["error"] = str(e)
+        resultado["debug"] = debug_info
         resultado["instrucoes"] = tarefa_info.get("instrucoes", "")
         resultado["resposta"] = resposta if 'resposta' in dir() else ""
         resultado["arquivos"] = arquivos if 'arquivos' in dir() else []

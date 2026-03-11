@@ -161,6 +161,23 @@ def _execute_client(client_id: int):
             client.last_check = datetime.utcnow()
 
             for task in resultado.get("tasks", []):
+                import json
+                # Prepara debug_data se existir
+                debug_data = ""
+                if task.get("debug"):
+                    try:
+                        debug_data = json.dumps(task["debug"], ensure_ascii=False)
+                    except Exception:
+                        pass
+
+                # Prepara arquivos_enviados
+                arquivos_json = ""
+                if task.get("arquivos"):
+                    try:
+                        arquivos_json = json.dumps(task["arquivos"], ensure_ascii=False)
+                    except Exception:
+                        pass
+
                 task_log = TaskLog(
                     client_id=client_id,
                     task_name=task.get("name", ""),
@@ -168,6 +185,10 @@ def _execute_client(client_id: int):
                     format=task.get("format", ""),
                     status=task.get("status", "error"),
                     error_msg=task.get("error", ""),
+                    instrucoes=task.get("instrucoes", ""),
+                    resposta=task.get("resposta", ""),
+                    arquivos_enviados=arquivos_json,
+                    debug_data=debug_data,
                 )
                 db.session.add(task_log)
                 if task.get("status") == "success":
