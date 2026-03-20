@@ -630,6 +630,7 @@ android.enableJetifier=true
 # Categorias de tarefas
 CATEGORIA_RESOLVIVEL = "RESOLVIVEL"
 CATEGORIA_RESOLVIVEL_MANUAL = "RESOLVIVEL_MANUAL"  # Resolver mas não enviar
+CATEGORIA_RESOLVER_PARCIAL = "RESOLVER_PARCIAL"  # Resolver exercicios, aluno adiciona fotos
 CATEGORIA_CERTIFICADO = "CERTIFICADO"
 CATEGORIA_AVISO = "AVISO"
 CATEGORIA_GRUPO = "GRUPO"
@@ -650,6 +651,7 @@ CATEGORIAS_PULAR = [
 # Categorias que resolvemos mas não enviamos automaticamente
 CATEGORIAS_ANEXAR_APENAS = [
     CATEGORIA_RESOLVIVEL_MANUAL,
+    CATEGORIA_RESOLVER_PARCIAL,
 ]
 
 
@@ -704,16 +706,23 @@ CATEGORIAS:
    Usamos quando: podemos gerar o arquivo, mas a entrega exige repositorio/link externo
    O sistema vai GERAR o arquivo e ANEXAR, mas NAO vai clicar em entregar
 
-3. CERTIFICADO - Exige documento pessoal do aluno que ele precisa ter
+3. RESOLVER_PARCIAL - Tarefa que pede exercicios + FOTOS/PRINTS do aluno
+   Exemplos: "resolva os exercicios e tire fotos", "faca e envie print/foto do resultado"
+   Usamos quando: podemos RESOLVER os exercicios, mas o aluno precisa adicionar fotos/prints proprios
+   O sistema vai RESOLVER os exercicios, gerar PDF com resolucoes, ANEXAR, mas NAO enviar
+   O aluno depois adiciona suas fotos e envia manualmente
+   IMPORTANTE: Se pede apenas "salve em PDF" sem mencionar fotos, e RESOLVIVEL normal
+
+4. CERTIFICADO - Exige documento pessoal do aluno que ele precisa ter
    Exemplos: upload de certificado de curso, comprovante de atividade extracurricular, declaracao pessoal
 
-4. AVISO - Apenas comunicado informativo, NAO requer entrega
+5. AVISO - Apenas comunicado informativo, NAO requer entrega
    Exemplos: lembrete de prova, informativo sobre aula, orientacoes gerais, aviso de ferias
 
-5. GRUPO - Requer formacao de equipe ou decisao coletiva
+6. GRUPO - Requer formacao de equipe ou decisao coletiva
    Exemplos: escolher grupo, definir tema com a equipe, cadastro de integrantes
 
-6. RECURSO_EXTERNO - Requer algo que o ALUNO JA PRECISA TER pronto OU ferramenta visual externa
+7. RECURSO_EXTERNO - Requer algo que o ALUNO JA PRECISA TER pronto OU ferramenta visual externa
    Exemplos: "envie o link do SEU portfolio existente", "link do SEU video JA GRAVADO no YouTube"
    TAMBEM INCLUI tarefas que exigem FERRAMENTAS VISUAIS/DESIGN que nao conseguimos gerar:
    - Wireframes/rabiscoframes/mockups usando: Excalidraw, Balsamiq, Figma, Adobe XD, Sketch, Canva
@@ -723,19 +732,20 @@ CATEGORIAS:
    IMPORTANTE: Se podemos CRIAR o conteudo mas precisa de repo, use RESOLVIVEL_MANUAL
    IMPORTANTE: NAO e recurso externo se for apenas acessar material do professor
 
-7. PRESENCIAL - Requer presenca fisica ou acao impossivel remotamente
+8. PRESENCIAL - Requer presenca fisica ou acao impossivel remotamente
    Exemplos: prova presencial, visita tecnica, apresentacao ao vivo
 
-8. PESSOAL - Requer experiencia ou opiniao UNICA e PESSOAL do aluno
+9. PESSOAL - Requer experiencia ou opiniao UNICA e PESSOAL do aluno
    Exemplos: "descreva SUA experiencia de estagio", "conte sobre SEU projeto pessoal", autoavaliacao
    IMPORTANTE: Perguntas genericas de opiniao (ex: "o que voce acha sobre X") SAO resolviveis
 
-9. INCERTO - Instrucoes confusas, incompletas ou ambiguas demais
+10. INCERTO - Instrucoes confusas, incompletas ou ambiguas demais
 
 REGRAS DE DECISAO:
 - Se parece uma tarefa academica normal (exercicio, trabalho, prova), e RESOLVIVEL
 - Se pede QUALQUER tipo de documento/texto/codigo como resposta E pode anexar direto, e RESOLVIVEL
 - SE PEDE CRIAR CODIGO/ARQUIVO + ENTREGAR VIA REPOSITORIO/GITHUB, e RESOLVIVEL_MANUAL
+- Se pede exercicios + "tire fotos", "envie prints", "fotografe", "capture a tela" = RESOLVER_PARCIAL
 - Se pede algo que o aluno JA PRECISA TER (video gravado, portfolio existente), e RECURSO_EXTERNO
 - Se menciona ferramentas como Excalidraw, Balsamiq, Figma, Canva, Draw.io, Miro para criar wireframes/mockups/prototipos, e RECURSO_EXTERNO
 - Se pede "crie X telas", "modele a interface", "faca wireframes/rabiscoframes", e RECURSO_EXTERNO
@@ -767,7 +777,7 @@ Responda APENAS com JSON valido, sem markdown:
 
         # Valida categoria
         categorias_validas = [
-            CATEGORIA_RESOLVIVEL, CATEGORIA_RESOLVIVEL_MANUAL,
+            CATEGORIA_RESOLVIVEL, CATEGORIA_RESOLVIVEL_MANUAL, CATEGORIA_RESOLVER_PARCIAL,
             CATEGORIA_CERTIFICADO, CATEGORIA_AVISO,
             CATEGORIA_GRUPO, CATEGORIA_RECURSO_EXTERNO, CATEGORIA_PRESENCIAL,
             CATEGORIA_PESSOAL, CATEGORIA_INCERTO

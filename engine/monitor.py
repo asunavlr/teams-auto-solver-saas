@@ -639,7 +639,7 @@ async def processar_nova_atividade(browser, atividade: dict, config: ClientConfi
     """Processa uma nova atividade para um cliente.
 
     Retorna dict com:
-        - status: 'success', 'skipped', 'skipped_already_submitted', 'not_found', 'group_ready', 'ready_manual', 'error'
+        - status: 'success', 'skipped', 'skipped_already_submitted', 'not_found', 'group_ready', 'ready_manual', 'photos_needed', 'error'
         - format: formato do arquivo (docx, pdf, etc)
         - error: mensagem de erro se houver
     """
@@ -1319,7 +1319,10 @@ CONTEUDO DO ARQUIVO {arquivo_externo}:
     # Flag para anexar apenas (não enviar automaticamente)
     # Inclui atividades em grupo - resolve mas não envia
     anexar_apenas = analise.get("anexar_apenas", False) or eh_grupo
-    if anexar_apenas and not eh_grupo:
+    eh_parcial = analise.get("categoria") == "RESOLVER_PARCIAL"
+    if eh_parcial:
+        log("  📸 Tarefa requer FOTOS do aluno - será resolvida e anexada, aluno adiciona fotos", config.nome)
+    elif anexar_apenas and not eh_grupo:
         log("  📎 Tarefa será resolvida mas NÃO enviada (requer envio manual)", config.nome)
     elif eh_grupo:
         log("  👥 Atividade em GRUPO - será resolvida e anexada, mas NÃO enviada", config.nome)
@@ -1500,6 +1503,10 @@ CONTEUDO DO ARQUIVO {arquivo_externo}:
                     msg = (f"[ATIVIDADE EM GRUPO - Envio manual necessário]\n\n"
                            f"A tarefa foi resolvida e o arquivo anexado, mas é uma atividade em grupo.\n"
                            f"Coordene com seu grupo e envie manualmente.\n\n{resposta[:500]}")
+                elif eh_parcial:
+                    msg = (f"[ADICIONE SUAS FOTOS - Envio manual necessário]\n\n"
+                           f"Os exercícios foram resolvidos e anexados.\n"
+                           f"Adicione suas fotos/prints conforme solicitado e envie manualmente.\n\n{resposta[:500]}")
                 else:
                     msg = (f"[ATENÇÃO: Envio manual necessário]\n\nA tarefa foi resolvida e o arquivo anexado, "
                            f"mas requer envio manual (ex: via repositório GitHub).\n\n{resposta[:500]}")
@@ -1523,7 +1530,13 @@ CONTEUDO DO ARQUIVO {arquivo_externo}:
                 await asyncio.sleep(1)
 
         await asyncio.sleep(3)
-        resultado["status"] = "group_ready" if eh_grupo else "ready_manual"
+        # Define status baseado no tipo
+        if eh_grupo:
+            resultado["status"] = "group_ready"
+        elif eh_parcial:
+            resultado["status"] = "photos_needed"
+        else:
+            resultado["status"] = "ready_manual"
         resultado["format"] = formato
         resultado["instrucoes"] = tarefa_info.get("instrucoes", "")
         resultado["resposta"] = resposta
@@ -1849,7 +1862,7 @@ async def ciclo_monitoramento_cliente(config: ClientConfig) -> dict:
                         salvar_tentativas_falhas(tentativas_falhas, config.processadas_path)
 
                     elif res["status"] != "error":
-                        # Sucesso, skipped, group_ready, ready_manual - marca como processada
+                        # Sucesso, skipped, group_ready, ready_manual, photos_needed - marca como processada
                         processadas[atividade_id] = {
                             "nome": atividade.get("nome", ""),
                             "disciplina": atividade.get("disciplina", ""),
@@ -1872,8 +1885,8 @@ async def ciclo_monitoramento_cliente(config: ClientConfig) -> dict:
                     }
                     resultado["tasks"].append(task_result)
 
-                    # Conta como sucesso: success, success_flagged, group_ready, ready_manual
-                    if res["status"] in ["success", "success_flagged", "group_ready", "ready_manual"]:
+                    # Conta como sucesso: success, success_flagged, group_ready, ready_manual, photos_needed
+                    if res["status"] in ["success", "success_flagged", "group_ready", "ready_manual", "photos_needed"]:
                         resultado["success"] += 1
                         tarefas_processadas_ciclo += 1  # Conta para o limite
                     elif res["status"] == "error":
