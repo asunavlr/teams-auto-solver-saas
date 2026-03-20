@@ -214,7 +214,7 @@ class TaskLog(db.Model):
     task_name = db.Column(db.String(300), nullable=False)
     discipline = db.Column(db.String(200), default="")
     format = db.Column(db.String(20), default="")
-    status = db.Column(db.String(20), default="success")
+    status = db.Column(db.String(50), default="success")
     error_msg = db.Column(db.Text, default="")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
