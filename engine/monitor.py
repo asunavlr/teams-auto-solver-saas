@@ -217,14 +217,13 @@ async def verificar_activity(browser, data_dir: Path, client_name: str = "", max
                         atividade["data"] = next_line
 
                 if atividade.get("nome"):
-                    # Cria ID unico com nome + disciplina + prazo para evitar duplicatas
-                    id_string = (
-                        atividade["nome"] +
-                        atividade.get("disciplina", "") +
-                        atividade.get("prazo", "") +
-                        atividade.get("data", "")
+                    # ID base: nome + disciplina (estavel, nao muda com atualizacoes)
+                    # Isso evita reprocessar quando professor apenas atualiza prazo/data
+                    id_base = (
+                        atividade["nome"].lower().strip() +
+                        atividade.get("disciplina", "").lower().strip()
                     )
-                    atividade["id"] = hashlib.md5(id_string.encode()).hexdigest()
+                    atividade["id"] = hashlib.md5(id_base.encode()).hexdigest()
                     atividades.append(atividade)
                     disciplina = atividade.get('disciplina', 'sem disciplina')
                     log(f"  Encontrada: {atividade['nome']} | {disciplina}", client_name)
@@ -233,7 +232,7 @@ async def verificar_activity(browser, data_dir: Path, client_name: str = "", max
             else:
                 i += 1
 
-        # Deduplica por ID (mesmo nome+disciplina+prazo+data gera mesmo hash)
+        # Deduplica por ID (mesmo nome+disciplina gera mesmo hash)
         vistos = set()
         atividades_unicas = []
         for a in atividades:
@@ -1787,7 +1786,16 @@ async def ciclo_monitoramento_cliente(config: ClientConfig) -> dict:
         processadas = carregar_processadas(config.processadas_path)
         update_client_status(config.client_id, "running", "Verificando atividades...")
         atividades = await verificar_activity(browser, config.data_dir, config.nome, agent=agent)
-        novas = [a for a in atividades if a.get("id") not in processadas]
+
+        # Filtra atividades ja processadas e loga as ignoradas
+        novas = []
+        for a in atividades:
+            if a.get("id") in processadas:
+                info_processada = processadas[a["id"]]
+                nome_proc = info_processada.get("nome", a.get("nome", ""))[:40]
+                log(f"  Ignorando (ja processada): {nome_proc}", config.nome)
+            else:
+                novas.append(a)
 
         # Carrega contador de tentativas falhas
         tentativas_falhas = carregar_tentativas_falhas(config.processadas_path)
