@@ -154,6 +154,8 @@ def executar_cliente(self, client_id: int):
                         arquivos_enviados=arquivos_json,
                     )
                     db.session.add(task_log)
+                    # Flush individual para evitar batch insert problematico no Supabase
+                    db.session.flush()
 
                     # Conta e incrementa
                     if task.get("status") == "success":
