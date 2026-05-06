@@ -20,7 +20,7 @@ services:
   worker:
     build: .
     container_name: teams-worker
-    command: celery -A tasks worker --concurrency=2 --loglevel=info
+    command: celery -A tasks worker --pool=solo --concurrency=1 --max-tasks-per-child=1 --loglevel=info
     env_file: .env
     environment:
       - REDIS_URL=redis://redis:6379

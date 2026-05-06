@@ -12,6 +12,26 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import asyncio
 import json
+
+
+def _run_async(coro):
+    """Executa uma corrotina num event loop novo e isolado.
+
+    Evita o erro "Event loop is closed" do Playwright dentro de workers
+    Celery, onde reusar/fechar o loop padrao do asyncio.run() corrompe
+    o estado de subprocessos do driver Node.
+    """
+    loop = asyncio.new_event_loop()
+    try:
+        asyncio.set_event_loop(loop)
+        return loop.run_until_complete(coro)
+    finally:
+        try:
+            loop.run_until_complete(loop.shutdown_asyncgens())
+        except Exception:
+            pass
+        loop.close()
+        asyncio.set_event_loop(None)
 from datetime import datetime
 from pathlib import Path
 from celery import Celery
@@ -123,7 +143,7 @@ def executar_cliente(self, client_id: int):
             )
 
             # Executa o ciclo (async)
-            resultado = asyncio.run(ciclo_monitoramento_cliente(config))
+            resultado = _run_async(ciclo_monitoramento_cliente(config))
 
             # Processa resultados
             tasks_success = 0
@@ -276,7 +296,7 @@ def desfazer_envio_tarefa(self, log_id: int, reprocessar: bool = False):
         try:
             from engine.undo import desfazer_envio
 
-            resultado = asyncio.run(desfazer_envio(
+            resultado = _run_async(desfazer_envio(
                 client_id=client.id,
                 task_name=task_log.task_name,
                 discipline=task_log.discipline,
@@ -360,7 +380,7 @@ def reenviar_tarefa_com_arquivos(self, log_id: int, arquivos: list):
         try:
             from engine.resubmit import reenviar_tarefa
 
-            resultado = asyncio.run(reenviar_tarefa(
+            resultado = _run_async(reenviar_tarefa(
                 client_id=client.id,
                 task_name=task_log.task_name,
                 discipline=task_log.discipline,
